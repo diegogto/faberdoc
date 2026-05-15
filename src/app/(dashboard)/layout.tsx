@@ -1,32 +1,105 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { UserNav } from "@/components/layout/user-nav";
-import {
-  mockProjectsWithRole,
-  getMockCurrentUser,
-  getMockCurrentOrganization,
-} from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import type { ProjectWithRole, User } from "@/lib/types";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const currentUser = getMockCurrentUser();
-  const currentOrg = getMockCurrentOrganization();
+  const supabase = await createClient();
+
+  // Obtener usuario autenticado — SIEMPRE usar getUser() en el servidor
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (!authUser) {
+    redirect("/login");
+  }
+
+  // Obtener perfil del usuario y su organización
+  const { data: userProfile } = await supabase
+    .from("users")
+    .select("*, organizations(id, name, org_type)")
+    .eq("id", authUser.id)
+    .single();
+
+  // Fallback si el perfil aún no está creado (primer login)
+  const currentUser: User = userProfile ?? {
+    id: authUser.id,
+    organization_id: "",
+    full_name: authUser.email ?? "Usuario",
+    avatar_url: null,
+    created_at: new Date().toISOString(),
+  };
+
+  const organizationName =
+    (userProfile?.organizations as { name: string } | null)?.name ??
+    "Mi Organización";
+
+  const userOrgId = userProfile?.organization_id ?? "";
+
+  // Obtener proyectos donde el usuario es miembro
+  const { data: membershipRows } = await supabase
+    .from("project_members")
+    .select(
+      `
+      role,
+      projects (
+        id,
+        name,
+        organization_id,
+        deleted_at,
+        organizations ( id, name )
+      )
+    `
+    )
+    .eq("user_id", authUser.id);
+
+  // Supabase devuelve `projects` como objeto (relación FK many-to-one).
+  // Usamos `unknown` como paso intermedio para el type cast.
+  type ProjectRow = {
+    id: string;
+    name: string;
+    organization_id: string;
+    deleted_at: string | null;
+    organizations: { id: string; name: string } | null;
+  };
+
+  const projectsWithRole: ProjectWithRole[] = (membershipRows ?? [])
+    .filter((row) => {
+      const project = row.projects as unknown as ProjectRow | null;
+      return project && !project.deleted_at;
+    })
+    .map((row) => {
+      const project = row.projects as unknown as ProjectRow;
+
+      return {
+        id: project.id,
+        name: project.name,
+        organization_id: project.organization_id,
+        organization_name: project.organizations?.name ?? "Sin organización",
+        role: row.role as ProjectWithRole["role"],
+        is_own_organization: project.organization_id === userOrgId,
+      };
+    });
 
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
       <Sidebar
-        projects={mockProjectsWithRole}
-        organizationName={currentOrg.name}
+        projects={projectsWithRole}
+        organizationName={organizationName}
       />
 
       {/* Main area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Global user nav bar (always visible) */}
         <div className="flex items-center justify-end h-[var(--topbar-height)] border-b border-border px-4 bg-background">
-          <UserNav user={currentUser} organizationName={currentOrg.name} />
+          <UserNav user={currentUser} organizationName={organizationName} />
         </div>
 
         {/* Page content */}
