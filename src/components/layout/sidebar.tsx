@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -9,6 +9,7 @@ import {
   FolderKanban,
   Building2,
   ExternalLink,
+  Plus,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -18,17 +19,34 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import type { ProjectWithRole } from "@/lib/types";
+import type { ProjectWithRole, User } from "@/lib/types";
+import { createProjectAction } from "@/app/(dashboard)/projects/actions";
 
 interface SidebarProps {
   projects: ProjectWithRole[];
   organizationName: string;
+  user: User;
 }
 
-export function Sidebar({ projects, organizationName }: SidebarProps) {
+export function Sidebar({ projects, organizationName, user }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [projectName, setProjectName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const ownProjects = projects.filter((p) => p.is_own_organization);
   const externalProjects = projects.filter((p) => !p.is_own_organization);
@@ -36,88 +54,187 @@ export function Sidebar({ projects, organizationName }: SidebarProps) {
   const isProjectActive = (projectId: string) =>
     pathname.startsWith(`/projects/${projectId}`);
 
+  const handleCreateProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!projectName.trim()) {
+      setError("El nombre del proyecto es requerido.");
+      return;
+    }
+
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.append("name", projectName.trim());
+
+      const result = await createProjectAction(formData);
+
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setProjectName("");
+        setIsDialogOpen(false);
+      }
+    });
+  };
+
   return (
-    <aside
-      className={cn(
-        "sidebar-transition relative flex flex-col border-r border-border bg-sidebar h-full",
-        isCollapsed ? "w-[var(--sidebar-collapsed-width)]" : "w-[var(--sidebar-width)]"
-      )}
-    >
-      {/* Logo / Brand */}
-      <div
+    <Dialog open={isDialogOpen} onOpenChange={(open) => {
+      setIsDialogOpen(open);
+      if (!open) {
+        setProjectName("");
+        setError(null);
+      }
+    }}>
+      <aside
         className={cn(
-          "flex items-center h-[var(--topbar-height)] border-b border-border px-3",
-          isCollapsed ? "justify-center" : "gap-2"
+          "sidebar-transition relative flex flex-col border-r border-border bg-sidebar h-full",
+          isCollapsed ? "w-[var(--sidebar-collapsed-width)]" : "w-[var(--sidebar-width)]"
         )}
       >
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <FolderKanban className="h-4 w-4" />
+        {/* Logo / Brand */}
+        <div
+          className={cn(
+            "flex items-center h-[var(--topbar-height)] border-b border-border px-3",
+            isCollapsed ? "justify-center" : "gap-2"
+          )}
+        >
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <FolderKanban className="h-4 w-4" />
+          </div>
+          {!isCollapsed && (
+            <span className="text-sm font-semibold tracking-tight truncate">
+              Faberdoc
+            </span>
+          )}
         </div>
-        {!isCollapsed && (
-          <span className="text-sm font-semibold tracking-tight truncate">
-            Faberdoc
-          </span>
-        )}
-      </div>
 
-      {/* Projects List */}
-      <ScrollArea className="flex-1 notion-scroll">
-        <div className={cn("py-2", isCollapsed ? "px-1" : "px-2")}>
-          {/* Own Organization Projects */}
-          <SidebarSection
-            icon={<Building2 className="h-3.5 w-3.5" />}
-            title={organizationName}
-            isCollapsed={isCollapsed}
-          />
-          {ownProjects.map((project) => (
-            <SidebarProjectItem
-              key={project.id}
-              project={project}
-              isActive={isProjectActive(project.id)}
-              isCollapsed={isCollapsed}
-            />
-          ))}
-
-          {externalProjects.length > 0 && (
-            <>
-              <Separator className="my-3" />
-              {/* External Projects */}
+        {/* Projects List */}
+        <ScrollArea className="flex-1 notion-scroll">
+          <div className={cn("py-2", isCollapsed ? "px-1" : "px-2")}>
+            {/* Own Organization Projects */}
+            <div className="flex items-center justify-between group/section pr-2">
               <SidebarSection
-                icon={<ExternalLink className="h-3.5 w-3.5" />}
-                title="Proyectos Externos"
+                icon={<Building2 className="h-3.5 w-3.5" />}
+                title={organizationName}
                 isCollapsed={isCollapsed}
               />
-              {externalProjects.map((project) => (
+              {!isCollapsed && user.is_admin && (
+                <DialogTrigger
+                  className="h-5 w-5 rounded-md hover:bg-accent text-muted-foreground hover:text-accent-foreground flex items-center justify-center transition-all opacity-0 group-hover/section:opacity-100 focus:opacity-100 cursor-pointer duration-200"
+                  title="Crear Proyecto"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </DialogTrigger>
+              )}
+            </div>
+
+            {ownProjects.length === 0 ? (
+              !isCollapsed ? (
+                <p className="text-[11px] text-muted-foreground px-3 py-1 italic">
+                  Sin proyectos activos
+                </p>
+              ) : null
+            ) : (
+              ownProjects.map((project) => (
                 <SidebarProjectItem
                   key={project.id}
                   project={project}
                   isActive={isProjectActive(project.id)}
                   isCollapsed={isCollapsed}
-                  showOrganization
                 />
-              ))}
-            </>
-          )}
-        </div>
-      </ScrollArea>
+              ))
+            )}
 
-      {/* Collapse Toggle */}
-      <div className="border-t border-border p-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-center"
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          aria-label={isCollapsed ? "Expandir menú" : "Colapsar menú"}
-        >
-          {isCollapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
-    </aside>
+            {externalProjects.length > 0 && (
+              <>
+                <Separator className="my-3" />
+                {/* External Projects */}
+                <SidebarSection
+                  icon={<ExternalLink className="h-3.5 w-3.5" />}
+                  title="Proyectos Externos"
+                  isCollapsed={isCollapsed}
+                />
+                {externalProjects.map((project) => (
+                  <SidebarProjectItem
+                    key={project.id}
+                    project={project}
+                    isActive={isProjectActive(project.id)}
+                    isCollapsed={isCollapsed}
+                    showOrganization
+                  />
+                ))}
+              </>
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* Collapse Toggle */}
+        <div className="border-t border-border p-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-center"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            aria-label={isCollapsed ? "Expandir menú" : "Colapsar menú"}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </aside>
+
+      {/* Modal Dialog Content for Creating Project */}
+      <DialogContent className="sm:max-w-[425px]">
+        <form onSubmit={handleCreateProject}>
+          <DialogHeader>
+            <DialogTitle>Crear Nuevo Proyecto</DialogTitle>
+            <DialogDescription>
+              Ingresa el nombre del proyecto. Se creará con la codificación estándar y especialidades predefinidas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="flex flex-col gap-2">
+              <label htmlFor="name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Nombre del Proyecto
+              </label>
+              <Input
+                id="name"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="Ej. Edificio Costanera, Planta Solar..."
+                className="col-span-3"
+                disabled={isPending}
+                autoFocus
+              />
+              {error && (
+                <p className="text-xs font-medium text-destructive mt-1">
+                  {error}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDialogOpen(false)}
+              disabled={isPending}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Creando..." : "Crear Proyecto"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

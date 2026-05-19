@@ -1,4 +1,4 @@
-import { mockProjects } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -9,9 +9,25 @@ interface SettingsPageProps {
 
 export default async function SettingsPage({ params }: SettingsPageProps) {
   const { projectId } = await params;
+  const supabase = await createClient();
 
-  const project = mockProjects.find((p) => p.id === projectId);
+  const { data: project } = await supabase
+    .from("projects")
+    .select("name, naming_pattern, custom_properties_definition, client_info")
+    .eq("id", projectId)
+    .is("deleted_at", null)
+    .single();
+
   if (!project) notFound();
+
+  type CustomPropertyDef = {
+    key: string;
+    label: string;
+    type: string;
+    options?: string[];
+  };
+
+  const customProperties = (project.custom_properties_definition as unknown as CustomPropertyDef[]) ?? [];
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-6 space-y-8">
@@ -56,7 +72,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
           Propiedades Dinámicas (Campos JSONB)
         </h2>
         <div className="space-y-4">
-          {project.custom_properties_definition.map((prop) => (
+          {customProperties.map((prop) => (
             <div
               key={prop.key}
               className="rounded-lg border border-border p-4 space-y-2"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { LogOut, Settings, User as UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -11,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { User } from "@/lib/types";
+import { logoutAction } from "@/app/(auth)/login/actions";
 
 interface UserNavProps {
   user: User;
@@ -26,6 +28,14 @@ function getUserInitials(fullName: string): string {
 }
 
 export function UserNav({ user, organizationName }: UserNavProps) {
+  const [isPending, startTransition] = useTransition();
+
+  const handleLogout = () => {
+    startTransition(async () => {
+      await logoutAction();
+    });
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -49,20 +59,25 @@ export function UserNav({ user, organizationName }: UserNavProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem className="cursor-pointer">
           <UserIcon className="mr-2 h-4 w-4" />
           Mi Perfil
         </DropdownMenuItem>
-        <DropdownMenuItem>
+        <DropdownMenuItem className="cursor-pointer">
           <Settings className="mr-2 h-4 w-4" />
           Configuración
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-destructive">
+        <DropdownMenuItem 
+          className="text-destructive cursor-pointer disabled:pointer-events-none disabled:opacity-50"
+          onClick={handleLogout}
+          disabled={isPending}
+        >
           <LogOut className="mr-2 h-4 w-4" />
-          Cerrar Sesión
+          {isPending ? "Cerrando Sesión..." : "Cerrar Sesión"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
+

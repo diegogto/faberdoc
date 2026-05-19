@@ -16,6 +16,11 @@ export async function loginAction(formData: FormData) {
   });
 
   if (error) {
+    console.error("Supabase Auth Login Error:", {
+      message: error.message,
+      status: error.status,
+      name: error.name,
+    });
     redirect("/login?error=credentials");
   }
 
@@ -39,9 +44,22 @@ export async function signupAction(formData: FormData) {
   });
 
   if (error) {
-    redirect("/login?error=signup");
+    console.error("Supabase Auth Signup Error:", {
+      message: error.message,
+      status: error.status,
+      name: error.name,
+    });
+    redirect("/register?error=signup");
   }
 
   revalidatePath("/", "layout");
   redirect("/");
 }
+
+export async function logoutAction() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/login");
+}
+

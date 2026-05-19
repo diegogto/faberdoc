@@ -1,12 +1,12 @@
 import { FolderKanban } from "lucide-react";
-import { loginAction } from "./actions";
+import { signupAction } from "../login/actions";
 import Link from "next/link";
 
-interface LoginPageProps {
+interface RegisterPageProps {
   searchParams: Promise<{ error?: string }>;
 }
 
-export default async function LoginPage({ searchParams }: LoginPageProps) {
+export default async function RegisterPage({ searchParams }: RegisterPageProps) {
   const { error } = await searchParams;
 
   return (
@@ -18,24 +18,41 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             <FolderKanban className="h-6 w-6" />
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground animate-fade-in">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               Faberdoc
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Sistema de Control Documental
+              Crea tu cuenta de control documental
             </p>
           </div>
         </div>
 
         {/* Error notification */}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive text-center font-medium">
-            Credenciales inválidas. Inténtalo de nuevo.
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive text-center font-medium animate-shake">
+            Error al crear la cuenta. Inténtalo de nuevo.
           </div>
         )}
 
-        {/* Login Form */}
+        {/* Signup Form */}
         <form className="space-y-5">
+          <div className="space-y-2">
+            <label
+              htmlFor="full_name"
+              className="text-sm font-medium text-foreground"
+            >
+              Nombre completo
+            </label>
+            <input
+              id="full_name"
+              name="full_name"
+              type="text"
+              required
+              placeholder="Juan Pérez"
+              className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all"
+            />
+          </div>
+
           <div className="space-y-2">
             <label
               htmlFor="email"
@@ -71,21 +88,21 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
 
           <button
-            formAction={loginAction}
+            formAction={signupAction}
             className="w-full h-10 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] shadow-md shadow-primary/10 cursor-pointer"
           >
-            Iniciar sesión
+            Registrarse
           </button>
         </form>
 
-        {/* Navigation link to Register */}
+        {/* Navigation link to Login */}
         <p className="text-center text-sm text-muted-foreground">
-          ¿No tienes una cuenta?{" "}
+          ¿Ya tienes una cuenta?{" "}
           <Link
-            href="/register"
+            href="/login"
             className="font-medium text-primary hover:underline transition-all"
           >
-            Regístrate aquí
+            Inicia sesión
           </Link>
         </p>
       </div>

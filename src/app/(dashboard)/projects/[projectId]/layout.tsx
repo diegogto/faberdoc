@@ -1,5 +1,5 @@
 import { TopBar } from "@/components/layout/top-bar";
-import { mockProjects } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 
 interface ProjectLayoutProps {
@@ -12,9 +12,14 @@ export default async function ProjectLayout({
   params,
 }: ProjectLayoutProps) {
   const { projectId } = await params;
+  const supabase = await createClient();
 
-  // Find the project (mock lookup — will be Supabase query later)
-  const project = mockProjects.find((p) => p.id === projectId);
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, name")
+    .eq("id", projectId)
+    .is("deleted_at", null)
+    .single();
 
   if (!project) {
     notFound();

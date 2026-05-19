@@ -23,24 +23,29 @@ export default async function DashboardLayout({
   // Obtener perfil del usuario y su organización
   const { data: userProfile } = await supabase
     .from("users")
-    .select("*, organizations(id, name, org_type)")
+    .select("*, organizations(id, name)")
     .eq("id", authUser.id)
     .single();
 
-  // Fallback si el perfil aún no está creado (primer login)
-  const currentUser: User = userProfile ?? {
-    id: authUser.id,
-    organization_id: "",
-    full_name: authUser.email ?? "Usuario",
-    avatar_url: null,
-    created_at: new Date().toISOString(),
+  // Si no hay perfil o no tiene organización asociada, redirigir a Onboarding
+  if (!userProfile || !userProfile.organization_id) {
+    redirect("/onboarding");
+  }
+
+  const currentUser: User = {
+    id: userProfile.id,
+    organization_id: userProfile.organization_id,
+    full_name: userProfile.full_name,
+    avatar_url: userProfile.avatar_url,
+    is_admin: userProfile.is_admin ?? false,
+    created_at: userProfile.created_at,
   };
 
   const organizationName =
     (userProfile?.organizations as { name: string } | null)?.name ??
     "Mi Organización";
 
-  const userOrgId = userProfile?.organization_id ?? "";
+  const userOrgId = userProfile.organization_id;
 
   // Obtener proyectos donde el usuario es miembro
   const { data: membershipRows } = await supabase
@@ -93,6 +98,7 @@ export default async function DashboardLayout({
       <Sidebar
         projects={projectsWithRole}
         organizationName={organizationName}
+        user={currentUser}
       />
 
       {/* Main area */}

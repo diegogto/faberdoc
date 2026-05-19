@@ -11,17 +11,20 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS organizations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
-    org_type VARCHAR(50) NOT NULL CHECK (org_type IN ('OWNER', 'CLIENT', 'CONTRACTOR')),
+    email_domain VARCHAR(255),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
 );
+
+CREATE INDEX IF NOT EXISTS idx_organizations_email_domain ON organizations(email_domain);
 
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     organization_id UUID REFERENCES organizations(id),
     full_name VARCHAR(255) NOT NULL,
     avatar_url TEXT,
+    is_admin BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -200,25 +203,76 @@ CREATE POLICY "Users can update own profile"
     ON users FOR UPDATE
     USING (id = (SELECT auth.uid()));
 
--- Projects: Usuarios ven proyectos donde son miembros
+-- Función auxiliar de seguridad para verificar si un usuario es administrador de su organización
+CREATE OR REPLACE FUNCTION public.is_user_admin(user_uuid UUID, org_uuid UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.users 
+        WHERE id = user_uuid AND organization_id = org_uuid AND is_admin = TRUE
+    );
+$$;
+
+-- Projects: Usuarios ven proyectos donde son miembros o administradores
 CREATE POLICY "Users can view their projects"
     ON projects FOR SELECT
     USING (
-        id IN (
-            SELECT project_id FROM project_members
-            WHERE user_id = (SELECT auth.uid())
+        (
+            id IN (
+                SELECT project_id FROM public.project_members
+                WHERE user_id = auth.uid()
+            )
+            OR public.is_user_admin(auth.uid(), organization_id) = TRUE
         )
         AND deleted_at IS NULL
     );
+
+CREATE POLICY "Admins can insert projects"
+    ON projects FOR INSERT
+    WITH CHECK (
+        public.is_user_admin(auth.uid(), organization_id) = TRUE
+    );
+
+-- Función auxiliar de seguridad para romper la recursión infinita en RLS
+CREATE OR REPLACE FUNCTION public.get_user_projects(user_uuid UUID)
+RETURNS TABLE(project_id UUID)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+    SELECT project_id FROM public.project_members WHERE user_id = user_uuid;
+$$;
 
 -- Project members: Ver miembros de proyectos propios
 CREATE POLICY "Users can view project members"
     ON project_members FOR SELECT
     USING (
         project_id IN (
-            SELECT project_id FROM project_members
-            WHERE user_id = (SELECT auth.uid())
+            SELECT public.get_user_projects(auth.uid())
         )
+    );
+
+-- Función auxiliar de seguridad para verificar si un usuario es administrador de la organización dueña del proyecto
+CREATE OR REPLACE FUNCTION public.is_project_admin(user_uuid UUID, proj_uuid UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.users u
+        JOIN public.projects p ON p.organization_id = u.organization_id
+        WHERE u.id = user_uuid AND p.id = proj_uuid AND u.is_admin = TRUE
+    );
+$$;
+
+CREATE POLICY "Admins can insert members"
+    ON project_members FOR INSERT
+    WITH CHECK (
+        public.is_project_admin(auth.uid(), project_id) = TRUE
     );
 
 -- Documents: Usuarios ven documentos de sus proyectos

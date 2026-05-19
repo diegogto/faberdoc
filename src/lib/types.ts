@@ -37,6 +37,7 @@ export interface User {
   organization_id: string;
   full_name: string;
   avatar_url: string | null;
+  is_admin?: boolean;
   created_at: string;
 }
 
