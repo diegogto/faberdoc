@@ -55,3 +55,32 @@
 ### 3. Plan de Control e Integridad
 - Actualizado [[todo.md](file:///home/diegogto/Documents/Projects/Faberdoc/todo.md)] marcando los flujos correspondientes como finalizados.
 - Compilación del proyecto local verificada con éxito total (`npm run build` completado exitosamente en Next.js Turbopack con código de salida 0 y 0 errores).
+
+## [2026-05-20] Sesión 3: Master Document List (MDL), Nomenclatura Dinámica e Importación CSV
+**Hora:** 02:00 (Local Time)  
+**Objetivo:** Desarrollar la interfaz y la lógica de negocio del Master Document List (MDL). Implementar creación unitaria de documentos, importación masiva mediante CSV con mapeo interactivo de columnas, filtro dinámico y control de visibilidad de columnas, integrando con Supabase y validaciones RLS.
+
+### 1. Cambios en Código (Next.js & Supabase integration)
+- **Server Actions del MDL (`src/app/(dashboard)/projects/[projectId]/mdl/actions.ts`):**
+  - Implementado `createDocumentAction` para validar datos mediante **Zod**, resolver correlativos de nomenclatura y crear un documento junto a su revisión inicial (`DRAFT` sin archivos) y su primer log de emisión.
+  - Implementado `bulkImportDocumentsAction` para insertar lotes de documentos creados de forma masiva en transacciones.
+  - Implementada verificación de permisos basada en roles (`ADMIN`, `REVIEWER`, `OWNER_APPROVER`).
+- **Página Principal del MDL (`src/app/(dashboard)/projects/[projectId]/mdl/page.tsx`):**
+  - Carga en paralelo del proyecto, sus custom properties y su patrón de nomenclatura.
+  - Consulta en Supabase aplanando metadatos para TanStack Table y formateando fechas en formato local.
+  - Gestión correcta del estado de documentos sin archivos, mostrando `—` en revisión y estado.
+- **Componentes del MDL (`src/components/documents/`):**
+  - [[document-columns.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/document-columns.tsx)]: Columnas dinámicas generadas en tiempo de ejecución.
+  - [[document-create-dialog.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/document-create-dialog.tsx)]: Asistente de creación unitaria con previsualización en vivo del Naming Engine.
+  - [[document-import-dialog.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/document-import-dialog.tsx)]: Asistente de importación por pasos de CSV con selector de cabeceras, previsualización y mapeador interactivo de columnas a campos Faberdoc.
+  - [[document-toolbar.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/document-toolbar.tsx)]: Barra de herramientas con filtros dinámicos por propiedades personalizadas tipo *select* y buscador textual.
+  - [[document-table.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/document-table.tsx)]: Componente contenedor de TanStack Table que integra controles de visibilidad, filtros y modales.
+
+### 2. Cambios en Base de Datos (Supabase)
+- Sincronizado esquema de base de datos en [[schema.sql](file:///home/diegogto/Documents/Projects/Faberdoc/supabase/schema.sql)] para el correcto funcionamiento del MDL, perfiles y políticas RLS.
+
+### 3. Plan de Control e Integridad
+- Actualizado [[todo.md](file:///home/diegogto/Documents/Projects/Faberdoc/todo.md)] marcando los entregables de MDL y Naming Engine como completados.
+- Verificado que el proyecto compila limpiamente (`npm run build` sin errores de tipos ni warnings).
+- Ejecutado flujo de prueba extremo usando el browser para validar onboarding, creación del primer documento con código `PLAN-CIV-100-001` y visibilidad de columnas en vivo.
+

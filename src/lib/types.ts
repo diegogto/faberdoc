@@ -159,17 +159,16 @@ export interface Comment {
 
 // ─── View Models (Enriched types for UI display) ────────────────────────────
 
-/** Document row as displayed in the MDL table */
 export interface DocumentTableRow {
   id: string;
   document_code: string;
   title: string;
-  specialty: string;
-  area: string;
   latest_revision: string;
-  status: RevisionStatus;
+  status: RevisionStatus | null;
   planned_date: string | null;
   actual_date: string | null;
+  has_files?: boolean;
+  [key: string]: unknown;
 }
 
 /** Transmittal row as displayed in the transmittal table */

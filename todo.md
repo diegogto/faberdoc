@@ -15,13 +15,13 @@
 ## III. Panel de Control y Proyectos
 - [ ] Dashboard Principal de Usuario (resumen de tareas pendientes, últimas emisiones)
 - [ ] Módulo de Proyectos: Creación, asignación de miembros (`project_members`) y roles (ADMIN, REVIEWER, etc.)
-- [ ] Configuración del Naming Engine (patrón dinámico como `{PROY}-{ESP}-{NUM}`)
+- [x] Configuración del Naming Engine (patrón dinámico como `{PROY}-{ESP}-{NUM}`)
 
 ## IV. Master Delivery List (MDL)
-- [ ] Tabla principal interactiva (TanStack Table v8 + TanStack Query)
-- [ ] Filtros avanzados y ordenamiento por metadatos dinámicos
-- [ ] Carga masiva de MDL mediante importación (CSV/Excel)
-- [ ] Panel lateral (Sheet/Drawer) para inspeccionar metadatos y línea de tiempo de revisiones sin perder contexto
+- [x] Tabla principal interactiva (TanStack Table v8 + TanStack Query)
+- [x] Filtros avanzados y ordenamiento por metadatos dinámicos
+- [x] Carga masiva de MDL mediante importación (CSV/Excel)
+- [x] Panel lateral (Sheet/Drawer) para inspeccionar metadatos y línea de tiempo de revisiones sin perder contexto
 
 ## V. Control de Revisiones y Almacenamiento
 - [ ] Carga de archivos a Supabase Storage con subida directa y segura

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   useReactTable,
   getCoreRowModel,
@@ -9,6 +10,7 @@ import {
   flexRender,
   type SortingState,
   type ColumnFiltersState,
+  type VisibilityState,
 } from "@tanstack/react-table";
 import {
   Table,
@@ -18,39 +20,67 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { documentColumns } from "./document-columns";
+import { generateDocumentColumns } from "./document-columns";
 import { DocumentToolbar } from "./document-toolbar";
 import { DocumentDrawer } from "./document-drawer";
+import { DocumentCreateDialog } from "./document-create-dialog";
+import { DocumentImportDialog } from "./document-import-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { createClient } from "@/lib/supabase/client";
-import type { DocumentTableRow, DocumentDetail } from "@/lib/types";
+import type { DocumentTableRow, DocumentDetail, CustomPropertyDefinition } from "@/lib/types";
 
 interface DocumentTableProps {
   data: DocumentTableRow[];
+  projectId: string;
+  projectName: string;
+  customPropertiesDef: CustomPropertyDefinition[];
+  namingPattern: string;
 }
 
-export function DocumentTable({ data }: DocumentTableProps) {
+export function DocumentTable({
+  data,
+  projectId,
+  projectName,
+  customPropertiesDef,
+  namingPattern,
+}: DocumentTableProps) {
+  const router = useRouter();
+
+  // Estados de tabla
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
-  // Drawer state
+  // Estados de modales
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+
+  // Estado del panel lateral (Drawer)
   const [selectedDocumentDetail, setSelectedDocumentDetail] =
     useState<DocumentDetail | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
+  // Generar columnas de forma dinámica
+  const columns = useMemo(
+    () => generateDocumentColumns(customPropertiesDef),
+    [customPropertiesDef]
+  );
+
   const table = useReactTable({
     data,
-    columns: documentColumns,
+    columns,
     state: {
       sorting,
       columnFilters,
       globalFilter,
+      columnVisibility,
     },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -170,19 +200,28 @@ export function DocumentTable({ data }: DocumentTableProps) {
 
   const handleDrawerClose = () => {
     setIsDrawerOpen(false);
-    // Delay clearing data for exit animation
+    // Retrasar la limpieza de datos para permitir la animación de salida
     setTimeout(() => setSelectedDocumentDetail(null), 300);
   };
 
+  const handleRefreshData = () => {
+    router.refresh();
+  };
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-background border border-border rounded-lg shadow-xs overflow-hidden">
       {/* Toolbar */}
-      <DocumentToolbar table={table} />
+      <DocumentToolbar
+        table={table}
+        customPropertiesDef={customPropertiesDef}
+        onNewDocumentClick={() => setIsCreateOpen(true)}
+        onImportCSVClick={() => setIsImportOpen(true)}
+      />
 
       {/* Table */}
       <div className="flex-1 overflow-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted/30">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
@@ -191,7 +230,7 @@ export function DocumentTable({ data }: DocumentTableProps) {
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="h-9 px-4 text-muted-foreground"
+                    className="h-9 px-4 text-muted-foreground font-semibold"
                   >
                     {header.isPlaceholder
                       ? null
@@ -209,7 +248,7 @@ export function DocumentTable({ data }: DocumentTableProps) {
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  className="notion-table-row cursor-pointer border-b border-border/50"
+                  className="notion-table-row cursor-pointer border-b border-border/50 hover:bg-muted/40 transition-colors"
                   onClick={() => handleRowClick(row.original.id)}
                 >
                   {row.getVisibleCells().map((cell) => (
@@ -225,12 +264,12 @@ export function DocumentTable({ data }: DocumentTableProps) {
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={documentColumns.length}
-                  className="h-48"
+                  colSpan={table.getVisibleFlatColumns().length}
+                  className="h-64 text-center"
                 >
                   <EmptyState
-                    title="Sin documentos"
-                    description="No se encontraron documentos con los filtros aplicados."
+                    title="Sin documentos registrados"
+                    description="No hay documentos en la MDL para este proyecto o ningún registro coincide con los filtros."
                   />
                 </TableCell>
               </TableRow>
@@ -244,6 +283,28 @@ export function DocumentTable({ data }: DocumentTableProps) {
         documentDetail={selectedDocumentDetail}
         isOpen={isDrawerOpen}
         onClose={handleDrawerClose}
+      />
+
+      {/* Modal: Crear Documento */}
+      <DocumentCreateDialog
+        projectId={projectId}
+        projectName={projectName}
+        customPropertiesDef={customPropertiesDef}
+        namingPattern={namingPattern}
+        currentCount={data.length}
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSuccess={handleRefreshData}
+      />
+
+      {/* Modal: Importar CSV */}
+      <DocumentImportDialog
+        projectId={projectId}
+        projectName={projectName}
+        customPropertiesDef={customPropertiesDef}
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onSuccess={handleRefreshData}
       />
     </div>
   );
