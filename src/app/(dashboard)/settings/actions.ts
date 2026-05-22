@@ -1,10 +1,9 @@
 "use server";
 
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getRequestOrigin } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/email";
-import { headers } from "next/headers";
 
 // Esquemas de validación Zod
 const updateProfileSchema = z.object({
@@ -252,8 +251,7 @@ export async function inviteUserAction(email: string, isAdmin: boolean) {
     }
 
     // Enviar el correo de invitación
-    const headersList = await headers();
-    const origin = headersList.get("origin") ?? "";
+    const origin = await getRequestOrigin();
 
     const { data: orgInfo } = await supabase
       .from("organizations")

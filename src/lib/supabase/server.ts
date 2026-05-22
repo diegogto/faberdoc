@@ -30,3 +30,34 @@ export async function createClient() {
     }
   );
 }
+
+/**
+ * Obtiene el origen (protocolo + host) real de la solicitud,
+ * considerando proxies inversos (x-forwarded-host / x-forwarded-proto).
+ */
+export async function getRequestOrigin() {
+  const cookieStore = await cookies(); // Asegura contexto de request
+  const headersList = await import("next/headers").then(m => m.headers());
+  
+  const forwardedHost = headersList.get("x-forwarded-host");
+  const forwardedProto = headersList.get("x-forwarded-proto");
+
+  if (forwardedHost) {
+    const proto = forwardedProto || "https";
+    return `${proto}://${forwardedHost}`;
+  }
+
+  const origin = headersList.get("origin");
+  if (origin && origin !== "null") {
+    return origin;
+  }
+
+  const host = headersList.get("host");
+  if (host) {
+    const proto = host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https";
+    return `${proto}://${host}`;
+  }
+
+  return "";
+}
+

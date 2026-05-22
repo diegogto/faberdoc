@@ -42,9 +42,10 @@
 ## VIII. Perfil de Usuario y Recuperación
 - [x] Panel de control de usuario (`/settings`) para modificar el nombre
 - [x] Cambio de contraseña seguro para usuarios autenticados desde configuración
-- [x] Flujo de recuperación de contraseña perdida (`/forgot-password` y `/reset-password`)
+- [x] Flujo de recuperación de contraseña perdida (`/forgot-password` y `/reset-password`) con opción de enlace y código OTP
 - [x] Integración de Resend SMTP para envío de correos transaccionales (invitaciones y recuperación)
 - [x] Gestión organizativa en `/settings` (miembros, roles, invitaciones y solicitudes de acceso)
 - [x] Onboarding adaptativo con flujos de unirse por invitación, solicitar acceso o bypass de dominio
 
-
+## IX. Plantillas de Correo e Imagen de Marca
+- [ ] Diseñar formatos HTML atractivos y profesionales para los correos (registro de usuario, invitaciones de equipo, recuperación de contraseña, etc.)
