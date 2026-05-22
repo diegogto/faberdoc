@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { User } from "@/lib/types";
 import { logoutAction } from "@/app/(auth)/login/actions";
+import Link from "next/link";
 
 interface UserNavProps {
   user: User;
@@ -59,13 +60,17 @@ export function UserNav({ user, organizationName }: UserNavProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem className="cursor-pointer">
-          <UserIcon className="mr-2 h-4 w-4" />
-          Mi Perfil
+        <DropdownMenuItem className="cursor-pointer p-0">
+          <Link href="/settings" className="flex items-center w-full px-1.5 py-1">
+            <UserIcon className="mr-2 h-4 w-4" />
+            Mi Perfil
+          </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem className="cursor-pointer">
-          <Settings className="mr-2 h-4 w-4" />
-          Configuración
+        <DropdownMenuItem className="cursor-pointer p-0">
+          <Link href="/settings?tab=org" className="flex items-center w-full px-1.5 py-1">
+            <Settings className="mr-2 h-4 w-4" />
+            Configuración
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem 

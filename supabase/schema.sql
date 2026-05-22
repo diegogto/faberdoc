@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     organization_id UUID REFERENCES organizations(id),
     full_name VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
     avatar_url TEXT,
     is_admin BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW()
@@ -149,6 +150,28 @@ CREATE TABLE IF NOT EXISTS comments (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS organization_invitations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    is_admin BOOLEAN DEFAULT FALSE,
+    invited_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACCEPTED', 'DECLINED')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(organization_id, email)
+);
+
+CREATE TABLE IF NOT EXISTS join_requests (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(user_id, organization_id)
+);
+
 -- ══════════════════════════════════════════════════════════════
 -- ROW LEVEL SECURITY (RLS) — Políticas básicas
 -- ══════════════════════════════════════════════════════════════
@@ -167,6 +190,8 @@ ALTER TABLE issuance_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transmittals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transmittal_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organization_invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE join_requests ENABLE ROW LEVEL SECURITY;
 
 -- ── Políticas: Usuarios ven datos de sus proyectos ──────────
 
@@ -185,17 +210,22 @@ CREATE POLICY "Users can view their own organization"
         )
     );
 
--- Users: Usuarios ven su propio perfil y compañeros de proyecto
-CREATE POLICY "Users can view project teammates"
+-- Función auxiliar segura para obtener la organización del usuario sin causar recursión
+CREATE OR REPLACE FUNCTION public.get_user_org(user_uuid UUID)
+RETURNS UUID
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+    SELECT organization_id FROM public.users WHERE id = user_uuid;
+$$;
+
+-- Users: Usuarios ven miembros de su organización
+CREATE POLICY "Users can view members of their organization"
     ON users FOR SELECT
     USING (
-        id = (SELECT auth.uid())
-        OR
-        id IN (
-            SELECT pm2.user_id FROM project_members pm1
-            JOIN project_members pm2 ON pm2.project_id = pm1.project_id
-            WHERE pm1.user_id = (SELECT auth.uid())
-        )
+        id = auth.uid()
+        OR organization_id = public.get_user_org(auth.uid())
     );
 
 -- Users: Pueden actualizar su propio perfil
@@ -375,6 +405,36 @@ CREATE POLICY "Users can view own org expenses"
         )
     );
 
+-- Políticas RLS para invitaciones
+CREATE POLICY "Admins can view and manage their organization invitations"
+    ON organization_invitations
+    FOR ALL
+    USING (
+        public.is_user_admin(auth.uid(), organization_id) = TRUE
+    );
+
+CREATE POLICY "Users can view invitations matching their email"
+    ON organization_invitations
+    FOR SELECT
+    USING (
+        email = (SELECT email FROM users WHERE id = auth.uid())
+    );
+
+-- Políticas RLS para solicitudes de acceso
+CREATE POLICY "Admins can view and manage organization join requests"
+    ON join_requests
+    FOR ALL
+    USING (
+        public.is_user_admin(auth.uid(), organization_id) = TRUE
+    );
+
+CREATE POLICY "Users can view and manage their own join requests"
+    ON join_requests
+    FOR ALL
+    USING (
+        user_id = auth.uid()
+    );
+
 -- ══════════════════════════════════════════════════════════════
 -- TRIGGER: Auto-crear perfil en users al registrarse via Auth
 -- ══════════════════════════════════════════════════════════════
@@ -384,10 +444,11 @@ RETURNS TRIGGER
 SET search_path = ''
 AS $$
 BEGIN
-    INSERT INTO public.users (id, full_name, avatar_url)
+    INSERT INTO public.users (id, full_name, email, avatar_url)
     VALUES (
         NEW.id,
         COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
+        NEW.email,
         NEW.raw_user_meta_data->>'avatar_url'
     );
     RETURN NEW;

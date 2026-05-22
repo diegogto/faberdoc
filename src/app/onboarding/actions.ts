@@ -196,3 +196,112 @@ export async function logoutAction() {
   revalidatePath("/", "layout");
   redirect("/login");
 }
+
+export async function joinExistingOrgAction(orgId: string) {
+  try {
+    const userSupabase = await createClient();
+    const { data: { user: authUser } } = await userSupabase.auth.getUser();
+    if (!authUser) return { error: "No estás autenticado." };
+
+    const adminSupabase = createAdminClient();
+
+    // 1. Verificar si ya existe una solicitud de este usuario
+    const { data: existing } = await adminSupabase
+      .from("join_requests")
+      .select("id")
+      .eq("user_id", authUser.id)
+      .eq("organization_id", orgId)
+      .maybeSingle();
+
+    if (existing) {
+      return { error: "Ya tienes una solicitud pendiente para unirte a esta organización." };
+    }
+
+    // 2. Insertar solicitud
+    const { error } = await adminSupabase
+      .from("join_requests")
+      .insert({
+        user_id: authUser.id,
+        organization_id: orgId,
+        status: "PENDING",
+      });
+
+    if (error) {
+      return { error: `No se pudo enviar la solicitud. Detalle: ${error.message}` };
+    }
+
+    revalidatePath("/onboarding");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Error inesperado." };
+  }
+}
+
+export async function acceptInvitationAction(invitationId: string) {
+  const userSupabase = await createClient();
+  const { data: { user: authUser } } = await userSupabase.auth.getUser();
+  if (!authUser) return { error: "No estás autenticado." };
+
+  const adminSupabase = createAdminClient();
+
+  // 1. Obtener la invitación pendiente
+  const { data: invitation, error: fetchError } = await adminSupabase
+    .from("organization_invitations")
+    .select("*")
+    .eq("id", invitationId)
+    .eq("email", authUser.email?.toLowerCase())
+    .eq("status", "PENDING")
+    .maybeSingle();
+
+  if (fetchError || !invitation) {
+    return { error: "La invitación no es válida, ha expirado o ya fue aceptada." };
+  }
+
+  // 2. Asociar el usuario a la organización
+  const { error: userError } = await adminSupabase
+    .from("users")
+    .update({
+      organization_id: invitation.organization_id,
+      is_admin: invitation.is_admin,
+    })
+    .eq("id", authUser.id);
+
+  if (userError) {
+    return { error: `No se pudo asociar tu usuario a la organización: ${userError.message}` };
+  }
+
+  // 3. Actualizar el estado de la invitación
+  await adminSupabase
+    .from("organization_invitations")
+    .update({ status: "ACCEPTED" })
+    .eq("id", invitationId);
+
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+
+export async function cancelJoinRequestAction(requestId: string) {
+  try {
+    const userSupabase = await createClient();
+    const { data: { user: authUser } } = await userSupabase.auth.getUser();
+    if (!authUser) return { error: "No estás autenticado." };
+
+    const adminSupabase = createAdminClient();
+
+    const { error } = await adminSupabase
+      .from("join_requests")
+      .delete()
+      .eq("id", requestId)
+      .eq("user_id", authUser.id);
+
+    if (error) {
+      return { error: `No se pudo cancelar la solicitud: ${error.message}` };
+    }
+
+    revalidatePath("/onboarding");
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message || "Error inesperado." };
+  }
+}
+

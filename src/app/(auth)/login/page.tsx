@@ -3,11 +3,11 @@ import { loginAction } from "./actions";
 import Link from "next/link";
 
 interface LoginPageProps {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; success?: string }>;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { error } = await searchParams;
+  const { error, success } = await searchParams;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -27,10 +27,19 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
         </div>
 
-        {/* Error notification */}
+        {/* Error/Success notifications */}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive text-center font-medium">
-            Credenciales inválidas. Inténtalo de nuevo.
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive text-center font-medium animate-shake">
+            {error === "credentials" && "Credenciales inválidas. Inténtalo de nuevo."}
+            {error === "session-expired" && "La sesión de restauración ha expirado o es inválida."}
+            {error === "auth-code-error" && "El enlace de autenticación no es válido o ha expirado."}
+            {error !== "credentials" && error !== "session-expired" && error !== "auth-code-error" && "Ha ocurrido un error. Inténtalo de nuevo."}
+          </div>
+        )}
+
+        {success === "password-reset" && (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-600 dark:text-emerald-400 text-center font-medium">
+            Contraseña restablecida con éxito. Inicia sesión con tus nuevas credenciales.
           </div>
         )}
 
@@ -54,12 +63,20 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
 
           <div className="space-y-2">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-foreground"
-            >
-              Contraseña
-            </label>
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="password"
+                className="text-sm font-medium text-foreground"
+              >
+                Contraseña
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-xs font-medium text-primary hover:underline transition-all"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
             <input
               id="password"
               name="password"

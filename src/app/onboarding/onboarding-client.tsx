@@ -1,14 +1,29 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { FolderKanban, LogOut, AlertTriangle, ChevronRight } from "lucide-react";
-import { completeOnboardingAction, logoutAction } from "./actions";
+import { FolderKanban, LogOut, AlertTriangle, ChevronRight, Check, Loader2, Hourglass } from "lucide-react";
+import {
+  completeOnboardingAction,
+  logoutAction,
+  joinExistingOrgAction,
+  acceptInvitationAction,
+  cancelJoinRequestAction,
+} from "./actions";
 
 interface OnboardingClientProps {
   userEmail: string;
   corporateDomain: string | null;
   existingOrg: { id: string; name: string } | null;
   members: string[];
+  pendingInvitation?: {
+    id: string;
+    organization_id: string;
+    organization_name: string;
+  } | null;
+  pendingJoinRequest?: {
+    id: string;
+    organization_name: string;
+  } | null;
 }
 
 export function OnboardingClient({
@@ -16,13 +31,17 @@ export function OnboardingClient({
   corporateDomain,
   existingOrg,
   members,
+  pendingInvitation = null,
+  pendingJoinRequest = null,
 }: OnboardingClientProps) {
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isLoggingOut, startLogoutTransition] = useTransition();
 
   const handleLogout = () => {
     setError(null);
+    setSuccessMsg(null);
     startLogoutTransition(async () => {
       await logoutAction();
     });
@@ -31,6 +50,7 @@ export function OnboardingClient({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
     const formData = new FormData(e.currentTarget);
 
     startTransition(async () => {
@@ -41,11 +61,53 @@ export function OnboardingClient({
     });
   };
 
+  // Solicitar ingresar a organización detectada
+  const handleRequestJoin = (orgId: string) => {
+    setError(null);
+    setSuccessMsg(null);
+    startTransition(async () => {
+      const res = await joinExistingOrgAction(orgId);
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setSuccessMsg("¡Solicitud enviada! Tu solicitud de acceso está en espera de aprobación por un administrador.");
+        window.location.reload(); // Recargar la página para cargar la vista de solicitud pendiente
+      }
+    });
+  };
+
+  // Aceptar invitación recibida
+  const handleAcceptInvite = (invitationId: string) => {
+    setError(null);
+    setSuccessMsg(null);
+    startTransition(async () => {
+      const res = await acceptInvitationAction(invitationId);
+      if (res && res.error) {
+        setError(res.error);
+      }
+    });
+  };
+
+  // Cancelar solicitud pendiente
+  const handleCancelRequest = (requestId: string) => {
+    setError(null);
+    setSuccessMsg(null);
+    startTransition(async () => {
+      const res = await cancelJoinRequestAction(requestId);
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setSuccessMsg("Solicitud cancelada correctamente.");
+        window.location.reload(); // Recargar para volver a la pantalla inicial de onboarding
+      }
+    });
+  };
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground antialiased">
       <div className="w-full max-w-sm space-y-8">
         
-        {/* Brand Header (Totalmente consistente con Login/Register) */}
+        {/* Brand Header */}
         <div className="flex flex-col items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
             <FolderKanban className="h-6 w-6" />
@@ -60,10 +122,119 @@ export function OnboardingClient({
           </div>
         </div>
 
-        {/* Card Contenedora (Consistente con los estilos de shadcn y login) */}
+        {/* Card Contenedora */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-md text-card-foreground">
-          {existingOrg ? (
-            /* ================= PANTALLA A: DETECTADO DOMINIO DUPLICADO ================= */
+          {error && (
+            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs font-medium text-destructive text-center">
+              {error}
+            </div>
+          )}
+
+          {successMsg && (
+            <div className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs font-medium text-emerald-600 dark:text-emerald-400 text-center">
+              {successMsg}
+            </div>
+          )}
+
+          {/* CASO 1: INVITACIÓN PENDIENTE */}
+          {pendingInvitation ? (
+            <div className="space-y-6">
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/20">
+                  <Check className="h-5 w-5" />
+                </div>
+                <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                  Tienes una invitación pendiente
+                </h2>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Fuiste invitado a unirte como miembro de:
+                </p>
+                <div className="mt-3 w-full rounded-lg border border-input bg-muted/30 px-3 py-2 text-sm font-bold text-foreground text-center">
+                  {pendingInvitation.organization_name}
+                </div>
+              </div>
+
+              <div className="pt-2 space-y-3">
+                <button
+                  onClick={() => handleAcceptInvite(pendingInvitation.id)}
+                  disabled={isPending}
+                  className="group flex w-full h-10 items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] shadow-md shadow-primary/10 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      Aceptar Invitación y Unirse
+                      <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  disabled={isLoggingOut || isPending}
+                  className="flex w-full h-10 items-center justify-center gap-2 rounded-lg border border-input bg-background text-sm font-medium text-foreground hover:bg-accent transition-all active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {isLoggingOut ? "Cerrando sesión..." : "Cerrar Sesión"}
+                </button>
+
+                <div className="text-center">
+                  <a
+                    href="/onboarding?bypass=true"
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors underline hover:no-underline"
+                  >
+                    Ignorar invitación y crear otra organización
+                  </a>
+                </div>
+              </div>
+            </div>
+          ) : /* CASO 2: SOLICITUD DE ACCESO PENDIENTE */
+          pendingJoinRequest ? (
+            <div className="space-y-6">
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                  <Hourglass className="h-5 w-5 animate-pulse" />
+                </div>
+                <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                  Solicitud en espera de aprobación
+                </h2>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Tu solicitud para ingresar a la siguiente organización está pendiente de revisión por el administrador:
+                </p>
+                <div className="mt-3 w-full rounded-lg border border-input bg-muted/30 px-3 py-2 text-sm font-semibold text-foreground text-center">
+                  {pendingJoinRequest.organization_name}
+                </div>
+                <p className="mt-4 text-[11px] text-muted-foreground">
+                  Te notificaremos cuando seas aprobado. Mientras tanto, no puedes acceder al dashboard.
+                </p>
+              </div>
+
+              <div className="pt-2 space-y-3">
+                <button
+                  onClick={() => handleCancelRequest(pendingJoinRequest.id)}
+                  disabled={isPending}
+                  className="flex w-full h-10 items-center justify-center gap-2 rounded-lg border border-destructive/20 hover:bg-destructive/10 text-destructive bg-background text-sm font-medium transition-all active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Cancelar Solicitud"
+                  )}
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  disabled={isLoggingOut || isPending}
+                  className="flex w-full h-10 items-center justify-center gap-2 rounded-lg border border-input bg-background text-sm font-medium text-foreground hover:bg-accent transition-all active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+                >
+                  <LogOut className="h-4 w-4" />
+                  {isLoggingOut ? "Cerrando sesión..." : "Cerrar Sesión"}
+                </button>
+              </div>
+            </div>
+          ) : /* CASO 3: DUPLICADO DE DOMINIO ENCONTRADO */
+          existingOrg ? (
             <div className="space-y-6">
               <div className="flex flex-col items-center text-center">
                 <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive border border-destructive/20">
@@ -79,14 +250,14 @@ export function OnboardingClient({
                   </strong>{" "}
                   está asociado a la organización ya registrada:
                 </p>
-                <div className="mt-3 w-full rounded-lg border border-input bg-muted/30 px-3 py-2 text-sm font-medium text-foreground text-center">
+                <div className="mt-3 w-full rounded-lg border border-input bg-muted/30 px-3 py-2 text-sm font-bold text-foreground text-center">
                   {existingOrg.name}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Para unirte, solicita acceso a uno de los miembros:
+                  Miembros actuales:
                 </p>
                 {members.length > 0 ? (
                   <div className="divide-y divide-border rounded-lg border border-border bg-background overflow-hidden">
@@ -101,12 +272,27 @@ export function OnboardingClient({
                   </div>
                 ) : (
                   <div className="rounded-lg border border-border bg-background p-3 text-center text-xs text-muted-foreground">
-                    No se encontraron miembros activos. Contacta a soporte.
+                    No se encontraron miembros activos.
                   </div>
                 )}
               </div>
 
               <div className="pt-1 space-y-3">
+                <button
+                  onClick={() => handleRequestJoin(existingOrg.id)}
+                  disabled={isPending}
+                  className="group flex w-full h-10 items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] shadow-md shadow-primary/10 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      Solicitar Acceso a la Organización
+                      <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    </>
+                  )}
+                </button>
+
                 <button
                   onClick={handleLogout}
                   disabled={isLoggingOut || isPending}
@@ -127,7 +313,7 @@ export function OnboardingClient({
               </div>
             </div>
           ) : (
-            /* ================= PANTALLA B: CREACIÓN FORMULARIO ESTÁNDAR ================= */
+            /* CASO 4: FORMULARIO ESTÁNDAR */
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <h2 className="text-base font-semibold tracking-tight text-foreground">
@@ -137,12 +323,6 @@ export function OnboardingClient({
                   Ingresa el nombre de tu empresa para empezar a controlar tus proyectos de ingeniería.
                 </p>
               </div>
-
-              {error && (
-                <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs font-medium text-destructive text-center">
-                  {error}
-                </div>
-              )}
 
               <div className="space-y-2">
                 <label
@@ -169,7 +349,7 @@ export function OnboardingClient({
                   className="group flex w-full h-10 items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] shadow-md shadow-primary/10 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
                 >
                   {isPending ? (
-                    "Configurando..."
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <>
                       Completar Configuración

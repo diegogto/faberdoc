@@ -38,3 +38,13 @@
 - [ ] Validación de límites de proyectos activos y espacio en disco en base de datos/backend
 - [ ] Bloqueo de operaciones de escritura (modo Read-Only) si la suscripción pasa a `PAST_DUE`
 - [ ] Historial financiero: inserción de cobros exitosos o fallidos en `subscription_expenses`
+
+## VIII. Perfil de Usuario y Recuperación
+- [x] Panel de control de usuario (`/settings`) para modificar el nombre
+- [x] Cambio de contraseña seguro para usuarios autenticados desde configuración
+- [x] Flujo de recuperación de contraseña perdida (`/forgot-password` y `/reset-password`)
+- [x] Integración de Resend SMTP para envío de correos transaccionales (invitaciones y recuperación)
+- [x] Gestión organizativa en `/settings` (miembros, roles, invitaciones y solicitudes de acceso)
+- [x] Onboarding adaptativo con flujos de unirse por invitación, solicitar acceso o bypass de dominio
+
+

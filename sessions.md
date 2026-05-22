@@ -84,3 +84,31 @@
 - Verificado que el proyecto compila limpiamente (`npm run build` sin errores de tipos ni warnings).
 - Ejecutado flujo de prueba extremo usando el browser para validar onboarding, creación del primer documento con código `PLAN-CIV-100-001` y visibilidad de columnas en vivo.
 
+## [2026-05-22] Sesión 4: Restablecimiento de Contraseña, Panel de Perfil y Organización, y Onboarding Adaptativo
+**Hora:** 14:00 (Local Time)  
+**Objetivo:** Desarrollar el flujo completo de olvido y cambio de contraseña, el panel de control de perfil y administración de la organización (incluyendo asignación de roles, expulsión, invitaciones de email y solicitudes de acceso), e implementar el flujo adaptativo en el onboarding.
+
+### 1. Cambios en Código (Next.js & Supabase integration)
+- **Recuperación de Contraseña:**
+  - Creadas las páginas [[forgot-password/page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/forgot-password/page.tsx)] y [[reset-password/page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/reset-password/page.tsx)] para solicitar y confirmar el cambio de contraseña.
+  - Creado el Route Handler [[route.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/auth/callback/route.ts)] para gestionar el intercambio de códigos de autenticación (`code`), resolviendo de forma segura la redirección pública detrás de proxies inversos VPS (`x-forwarded-host`).
+  - Añadidas las Server Actions `requestResetPasswordAction` y `resetPasswordAction` en [[actions.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/login/actions.ts)].
+- **Panel de Configuración y Gestión de Organización (`/settings`):**
+  - Creadas las Server Actions en [[actions.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/settings/actions.ts)] (validadas con **Zod**) para actualizar perfil, contraseña, invitar nuevos usuarios, cambiar roles (`is_admin`), remover usuarios y procesar solicitudes de acceso (`join_requests`).
+  - Creada la página principal [[page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/settings/page.tsx)] y el componente interactivo [[settings-client.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/settings/settings-client.tsx)] estructurado con pestañas para "Mi Perfil" (nombre/contraseña) y "Mi Organización":
+    - Los administradores pueden gestionar activamente a los miembros, cambiar roles, expulsar usuarios, invitar nuevos colaboradores (utilizando la integración SMTP con **Resend**) y aprobar/rechazar solicitudes de acceso.
+    - Los colaboradores normales disponen de una vista de solo lectura de los miembros.
+  - Integrada la entrega de emails transaccionales a través del wrapper [[email.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/lib/email.ts)] que se comunica directamente con la API REST de Resend de forma liviana y segura.
+- **Onboarding Adaptativo:**
+  - Modificado [[page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/onboarding/page.tsx)] y [[onboarding-client.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/onboarding/onboarding-client.tsx)] para verificar solicitudes de acceso y/o invitaciones pendientes del usuario:
+    - *Invitación pendiente*: Permite unirse directamente a la organización asociada.
+    - *Solicitud pendiente*: Informa del estado de espera de aprobación.
+    - *Dominio Duplicado*: Permite enviar una solicitud de acceso interactiva al administrador de la empresa.
+  - Modificado [[actions.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/onboarding/actions.ts)] con Server Actions para aceptar invitaciones, solicitar acceso y cancelar solicitudes.
+
+### 2. Cambios en Base de Datos (Supabase)
+- Creada la migración [[migration_settings_org.sql](file:///home/diegogto/Documents/Projects/Faberdoc/supabase/migration_settings_org.sql)] (registrada en `schema.sql`) agregando la columna `email` a `users`, creando las tablas `organization_invitations` y `join_requests`, y definiendo las políticas de seguridad RLS asociadas.
+
+### 3. Plan de Control e Integridad
+- Modificado [[user-nav.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/layout/user-nav.tsx)] para solucionar errores de tipado con `DropdownMenuItem` removiendo `asChild` innecesarios.
+- Compilación del proyecto local verificada con éxito total (`npm run build` completado con código de salida 0 en Next.js Turbopack y 0 errores).
