@@ -26,7 +26,6 @@ export const mockOrganizations: Organization[] = [
   {
     id: "org-001",
     name: "Ingeniería Fuller S.A.",
-    org_type: "OWNER",
     created_at: "2025-01-15T10:00:00Z",
     updated_at: "2025-01-15T10:00:00Z",
     deleted_at: null,
@@ -34,7 +33,6 @@ export const mockOrganizations: Organization[] = [
   {
     id: "org-002",
     name: "Constructora Vázquez",
-    org_type: "CONTRACTOR",
     created_at: "2025-02-01T10:00:00Z",
     updated_at: "2025-02-01T10:00:00Z",
     deleted_at: null,
@@ -42,7 +40,6 @@ export const mockOrganizations: Organization[] = [
   {
     id: "org-003",
     name: "Minera del Norte SpA",
-    org_type: "CLIENT",
     created_at: "2025-03-10T10:00:00Z",
     updated_at: "2025-03-10T10:00:00Z",
     deleted_at: null,

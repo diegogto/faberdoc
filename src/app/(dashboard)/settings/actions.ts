@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createClient, getRequestOrigin } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/email";
+import { getInviteEmailHtml } from "@/lib/email-templates";
 
 // Esquemas de validación Zod
 const updateProfileSchema = z.object({
@@ -260,24 +261,17 @@ export async function inviteUserAction(email: string, isAdmin: boolean) {
       .single();
 
     const orgName = orgInfo?.name ?? "Faberdoc Organization";
+    const roleLabel = validated.data.is_admin ? "Administrador" : "Colaborador";
+    const registerLink = `${origin}/register`;
 
-    const emailContent = `
-      <h2>Invitación de Faberdoc</h2>
-      <p>Has sido invitado a unirte a la organización <strong>${orgName}</strong> en Faberdoc como ${
-      validated.data.is_admin ? "Administrador" : "Colaborador"
-    }.</p>
-      <p>Para aceptar esta invitación y comenzar a trabajar, haz clic en el siguiente enlace para registrarte:</p>
-      <p>
-        <a href="${origin}/register" style="display:inline-block;background-color:#0f172a;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;">Registrarse en Faberdoc</a>
-      </p>
-      <p style="font-size:12px;color:#64748b;margin-top:20px;">Si no solicitaste esto, puedes ignorar este correo.</p>
-    `;
+    const emailContent = getInviteEmailHtml(orgName, roleLabel, registerLink);
 
     const emailResult = await sendEmail({
       to: validated.data.email.toLowerCase(),
       subject: `Invitación para unirte a ${orgName} en Faberdoc`,
       html: emailContent,
     });
+
 
     revalidatePath("/settings");
     return { success: true };

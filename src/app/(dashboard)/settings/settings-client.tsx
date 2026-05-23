@@ -40,7 +40,6 @@ interface SettingsClientProps {
   organization: {
     id: string;
     name: string;
-    org_type: string;
   };
   orgUsers: Array<{
     id: string;
@@ -461,9 +460,6 @@ export function SettingsClient({
                 <h3 className="font-bold text-lg text-foreground">
                   {organization.name}
                 </h3>
-                <p className="text-xs text-muted-foreground">
-                  Tipo: {organization.org_type}
-                </p>
               </div>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { FolderKanban } from "lucide-react";
-import { resetPasswordAction } from "../login/actions";
+import ResetPasswordFormClient from "./reset-password-client";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
@@ -43,37 +43,14 @@ export default async function ResetPasswordPage({
         {/* Error notification */}
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive text-center font-medium animate-shake">
-            Error al actualizar la contraseña. Inténtalo de nuevo.
+            {error === "password-mismatch"
+              ? "Las contraseñas ingresadas no coinciden."
+              : "Error al actualizar la contraseña. Inténtalo de nuevo."}
           </div>
         )}
 
         {/* Reset Password Form */}
-        <form className="space-y-5">
-          <div className="space-y-2">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-foreground"
-            >
-              Nueva Contraseña
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              minLength={6}
-              placeholder="••••••••"
-              className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all"
-            />
-          </div>
-
-          <button
-            formAction={resetPasswordAction}
-            className="w-full h-10 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] shadow-md shadow-primary/10 cursor-pointer"
-          >
-            Actualizar Contraseña
-          </button>
-        </form>
+        <ResetPasswordFormClient />
       </div>
     </div>
   );

@@ -81,12 +81,8 @@ export async function completeOnboardingAction(prevState: any, formData: FormDat
   const adminSupabase = createAdminClient();
 
   try {
-    // 4. Crear la organización con estrategia de doble-intento (resiliente a migraciones pendientes)
-    let orgData = null;
-    let orgError = null;
-
-    // Intento 1: Esquema Nuevo (email_domain, sin org_type)
-    const { data: newOrgData, error: newOrgError } = await adminSupabase
+    // 4. Crear la organización
+    const { data: orgData, error: createOrgError } = await adminSupabase
       .from("organizations")
       .insert({
         name,
@@ -95,26 +91,9 @@ export async function completeOnboardingAction(prevState: any, formData: FormDat
       .select("id")
       .single();
 
-    if (newOrgError) {
-      console.warn("Fallo al insertar con esquema nuevo (email_domain/no org_type), reintentando con esquema original:", newOrgError.message);
-      
-      // Intento 2 (Fallback): Esquema Original (org_type es requerido y debe ser 'OWNER', 'CLIENT' o 'CONTRACTOR')
-      const { data: oldOrgData, error: oldOrgError } = await adminSupabase
-        .from("organizations")
-        .insert({
-          name,
-          org_type: "OWNER", // Satisface la restricción CHECK original
-        } as any)
-        .select("id")
-        .single();
-
-      if (oldOrgError) {
-        console.error("Error al crear organización con ambos esquemas:", oldOrgError);
-        return { error: `No se pudo crear la organización. Detalle: ${oldOrgError.message}` };
-      }
-      orgData = oldOrgData;
-    } else {
-      orgData = newOrgData;
+    if (createOrgError) {
+      console.error("Error al crear organización:", createOrgError);
+      return { error: `No se pudo crear la organización. Detalle: ${createOrgError.message}` };
     }
 
     const organizationId = orgData.id;

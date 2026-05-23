@@ -1,5 +1,5 @@
 import { FolderKanban } from "lucide-react";
-import { signupAction } from "../login/actions";
+import RegisterFormClient from "./register-form-client";
 import Link from "next/link";
 
 interface RegisterPageProps {
@@ -30,70 +30,14 @@ export default async function RegisterPage({ searchParams }: RegisterPageProps) 
         {/* Error notification */}
         {error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive text-center font-medium animate-shake">
-            Error al crear la cuenta. Inténtalo de nuevo.
+            {error === "password-mismatch"
+              ? "Las contraseñas ingresadas no coinciden."
+              : "Error al crear la cuenta. Inténtalo de nuevo."}
           </div>
         )}
 
         {/* Signup Form */}
-        <form className="space-y-5">
-          <div className="space-y-2">
-            <label
-              htmlFor="full_name"
-              className="text-sm font-medium text-foreground"
-            >
-              Nombre completo
-            </label>
-            <input
-              id="full_name"
-              name="full_name"
-              type="text"
-              required
-              placeholder="Juan Pérez"
-              className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label
-              htmlFor="email"
-              className="text-sm font-medium text-foreground"
-            >
-              Email corporativo
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              required
-              placeholder="correo@empresa.com"
-              className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label
-              htmlFor="password"
-              className="text-sm font-medium text-foreground"
-            >
-              Contraseña
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              placeholder="••••••••"
-              className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all"
-            />
-          </div>
-
-          <button
-            formAction={signupAction}
-            className="w-full h-10 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] shadow-md shadow-primary/10 cursor-pointer"
-          >
-            Registrarse
-          </button>
-        </form>
+        <RegisterFormClient />
 
         {/* Navigation link to Login */}
         <p className="text-center text-sm text-muted-foreground">

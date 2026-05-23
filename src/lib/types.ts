@@ -5,8 +5,6 @@
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
-export type OrganizationType = "OWNER" | "CLIENT" | "CONTRACTOR";
-
 export type ProjectMemberRole =
   | "ADMIN"
   | "REVIEWER"
@@ -26,7 +24,6 @@ export type PaymentStatus = "PAID" | "PENDING" | "FAILED";
 export interface Organization {
   id: string;
   name: string;
-  org_type: OrganizationType;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

@@ -112,3 +112,26 @@
 ### 3. Plan de Control e Integridad
 - Modificado [[user-nav.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/layout/user-nav.tsx)] para solucionar errores de tipado con `DropdownMenuItem` removiendo `asChild` innecesarios.
 - Compilación del proyecto local verificada con éxito total (`npm run build` completado con código de salida 0 en Next.js Turbopack y 0 errores).
+
+## [2026-05-22] Sesión 5: Limpieza de `org_type` y Resolución de Conexión de Base de Datos (Supavisor)
+**Hora:** 20:20 (Local Time)  
+**Objetivo:** Eliminar por completo el campo `org_type` a nivel de base de datos, código y lógica, resolver problemas de conexión a la base de datos de producción mediante `psql` (Supavisor) y solucionar fallos internos de resolución de DNS en la red de Docker.
+
+### 1. Cambios en Código (Next.js & Cleanup)
+- **Eliminación de `org_type`:**
+  - Se removieron todas las referencias a `org_type` de las tablas, definiciones TypeScript, Server Actions de Onboarding, y datos mock de prueba.
+  - Esto obedece a que el rol de una organización es inherente a su relación con el proyecto (ej: Cliente, Contratista, Dueño) y no una propiedad global de la organización.
+
+### 2. Cambios en Base de Datos e Infraestructura (Docker / Supavisor)
+- **Sincronización de Contraseñas:**
+  - Ejecutada actualización de contraseñas mediante `ALTER ROLE` en Postgres para sincronizar los roles `postgres` y `supabase_admin` con la clave secreta definida en el entorno de Dokploy (`hy68ksij01rvo5nrychloqi6xrotgszx`).
+- **Resolución de Red e Interrupciones de DNS:**
+  - Configurada una red de puente virtual dedicada (`supabase-network`) en `docker-compose.yml` para aislar los contenedores de Supabase, resolviendo el bucle infinito de reinicios causados por el error `hostname: Temporary failure in name resolution`.
+  - Asegurada la correcta comunicación de todos los contenedores de la pila en la nueva red.
+
+### 3. Plan de Control e Integridad
+- **Verificación de Conectividad:**
+  - Probada la conexión por línea de comando externa `psql` usando el puerto `5432` de Supavisor de manera totalmente exitosa.
+- **Compilación del Proyecto:**
+  - Compilación del proyecto local verificada con éxito (`npm run build` completado con código de salida 0 y 0 errores).
+

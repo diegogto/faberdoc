@@ -35,13 +35,13 @@ export default async function SettingsPage() {
   }
 
   // 3. Obtener organización
-  const { data: organization } = await supabase
+  const { data: organization, error: orgError } = await supabase
     .from("organizations")
-    .select("id, name, org_type")
+    .select("id, name")
     .eq("id", userProfile.organization_id)
     .single();
 
-  if (!organization) {
+  if (orgError || !organization) {
     redirect("/onboarding");
   }
 
