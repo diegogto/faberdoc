@@ -4,11 +4,11 @@ import { useState, useTransition } from "react";
 import { FolderKanban, LogOut, AlertTriangle, ChevronRight, Check, Loader2, Hourglass } from "lucide-react";
 import {
   completeOnboardingAction,
-  logoutAction,
   joinExistingOrgAction,
   acceptInvitationAction,
   cancelJoinRequestAction,
 } from "./actions";
+import { logoutAction } from "@/app/(auth)/login/actions";
 
 interface OnboardingClientProps {
   userEmail: string;

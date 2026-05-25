@@ -42,8 +42,12 @@ Faberdoc es un sistema de Document Control para ingeniería. La interfaz debe im
 - Tabla `projects`: 
     - `organization_id`: Organización dueña.
     - `naming_pattern`: String con el formato de codificación (ej: "{PROY}-{ESP}-{NUM}").
+    - `versioning_logic`: Tipo de versionamiento ('MIXED' o 'SEPARATE_EMISSION').
+    - `review_flow_config`: Configuración JSONB del flujo interno de revisión (revisores, tipo de revisión paralela/subsecuente).
     - `custom_properties_definition`: JSONB que define campos dinámicos y sus opciones.
     - `client_info`: Metadata general del proyecto (JSONB).
+
+
 
 #### 4. Documentos (Contenedor Maestro)
 - Tabla `documents`: 
@@ -58,8 +62,12 @@ Faberdoc es un sistema de Document Control para ingeniería. La interfaz debe im
     - `document_id`: Relación con el documento.
     - `version_label`: Etiqueta visual (A, B, 01, 02).
     - `version_index`: Entero correlativo para ordenamiento cronológico.
-    - `status`: Estado (DRAFT, IN_REVIEW, APPROVED, ISSUED).
-- Tabla `files`: Relación con `revisions`. Almacena `s3_key` (Ruta en Supabase Storage), `file_name`, `file_size_bytes`.
+    - `emission_code`: Código o etiqueta de la emisión asociada (para lógica SEPARATE_EMISSION).
+    - `status`: Estado interno (DRAFT, IN_REVIEW, COMMENTED, APPROVED, ISSUED).
+    - `comment_level`: Nivel de comentarios (MINOR o MAJOR) cuando la revisión está COMMENTED.
+- Tabla `files`: Relación con `revisions`. Almacena `s3_key` (Ruta o Key de archivo), `file_name`, `file_size_bytes`.
+
+
 
 #### 6. Registro de Emisiones (Issuance Log)
 - Tabla `issuance_logs`: 
@@ -84,13 +92,23 @@ Faberdoc es un sistema de Document Control para ingeniería. La interfaz debe im
 
 ## 5. REGLAS DE NEGOCIO CRITICAS
 - **Naming Engine:** Función pura que genera el `document_code` basado en el patrón del proyecto y las `custom_properties`.
-- **Control de Versiones:** `version_index` para lógica interna; `version_label` para el usuario.
+- **Lógicas de Versionamiento (Configurables por Proyecto):**
+  - **MIXED:** Letras (`A`, `B`...) para borradores internos y números (`0`, `1`...) para revisiones emitidas a través de un Transmittal.
+  - **SEPARATE_EMISSION:** Versión numérica secuencial (`Rev 1`, `Rev 2`...) y una etiqueta/código de emisión (`emission_code`) definida por el usuario al realizar el envío (ej: `A`, `B` o texto libre).
+- **Control de Estados:**
+  - **Estado Interno:** Flujo interno (`DRAFT` -> `IN_REVIEW` <-> `COMMENTED` -> `APPROVED`). El flujo de revisión es configurable por proyecto por el administrador (revisores asignados, tipo de revisión paralela o secuencial).
+  - **Niveles de Comentarios (en estado COMMENTED):**
+    - **MINOR (Comentarios menores):** Si el encargado vuelve a subir el documento, este pasa automáticamente a estado `APPROVED`.
+    - **MAJOR (Comentarios mayores):** Al volver a subir el documento, el estado regresa a `IN_REVIEW` y debe pasar por el proceso completo de revisión.
+  - **Estado Externo (Emisión):** Reflejado al emitirse el Transmittal (cambia revisión a `ISSUED` y registra fecha real).
 - **Cierre de Comentarios:** Los comentarios no cerrados (`OPEN`) se arrastran automáticamente a la siguiente revisión generada.
 
+
 ## 6. SEGURIDAD Y ARCHIVOS
-- **Almacenamiento:** Archivos guardados en **Supabase Storage**. La DB solo guarda el `s3_key` (path).
-- **Acceso:** Uso exclusivo de URLs firmadas (Presigned URLs) con expiración corta generadas por Supabase.
+- **Almacenamiento:** Archivos subidos mediante una capa de abstracción de almacenamiento (`StorageService`) que guarda un identificador `s3_key` (path) en la base de datos. Esto desacopla el frontend de la decisión final sobre el proveedor físico de archivos.
+- **Acceso:** Uso de URLs firmadas temporales o rutas de descarga provistas por el adaptador de almacenamiento seleccionado.
 - **Privacidad y RLS:** Clientes/Contratistas solo ven documentos si existen en un Transmittal dirigido a su `organization_id`, garantizado a nivel de base de datos usando Supabase RLS.
+
 
 ## 7. INSTRUCCIONES PARA LA IA (CONTEXTO)
 - **Tipado:** TypeScript estricto. Generar los tipos a partir de la base de datos de Supabase. Prohibido el uso de `any`.

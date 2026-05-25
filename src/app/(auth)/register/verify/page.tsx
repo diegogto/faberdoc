@@ -1,0 +1,96 @@
+import { FolderKanban } from "lucide-react";
+import { verifySignupOtpAction } from "../../login/actions";
+import Link from "next/link";
+
+interface VerifyPageProps {
+  searchParams: Promise<{ email?: string; error?: string }>;
+}
+
+export default async function VerifySignupPage({
+  searchParams,
+}: VerifyPageProps) {
+  const { email, error } = await searchParams;
+  const decodedEmail = email ? decodeURIComponent(email) : "";
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm space-y-8">
+        {/* Brand Header */}
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
+            <FolderKanban className="h-6 w-6" />
+          </div>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Confirmar Cuenta
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1 px-4">
+              Hemos enviado un correo con tu código de verificación a <br />
+              <strong className="text-foreground">{decodedEmail || "tu correo"}</strong>
+            </p>
+          </div>
+        </div>
+
+        {/* Success/Error notifications */}
+        {error === "invalid-code" && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive text-center font-medium animate-shake">
+            El código de verificación ingresado es incorrecto o ha expirado.
+          </div>
+        )}
+
+        {error === "invalid-fields" && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive text-center font-medium animate-shake">
+            Por favor ingresa el código de 6 dígitos.
+          </div>
+        )}
+
+        {/* Info Box */}
+        <div className="rounded-lg border border-border bg-card p-4 text-xs text-muted-foreground leading-relaxed">
+          Por favor ingresa el código de 6 dígitos enviado a tu correo o sigue el enlace directo de confirmación dentro del mensaje.
+        </div>
+
+        {/* Verify OTP Form */}
+        <form className="space-y-5">
+          <input type="hidden" name="email" value={decodedEmail} />
+
+          <div className="space-y-2">
+            <label
+              htmlFor="token"
+              className="text-sm font-medium text-foreground flex justify-between"
+            >
+              <span>Código de verificación (6 dígitos)</span>
+            </label>
+            <input
+              id="token"
+              name="token"
+              type="text"
+              required
+              maxLength={6}
+              pattern="[a-zA-Z0-9]{6}"
+              placeholder="000000"
+              className="flex h-12 w-full rounded-lg border border-input bg-background px-3 py-2 text-center text-xl font-mono tracking-[0.5em] placeholder:text-muted-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-all uppercase"
+            />
+          </div>
+
+          <button
+            formAction={verifySignupOtpAction}
+            className="w-full h-10 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] shadow-md shadow-primary/10 cursor-pointer"
+          >
+            Confirmar cuenta
+          </button>
+        </form>
+
+        {/* Options to go back or change email */}
+        <p className="text-center text-sm text-muted-foreground">
+          ¿Ingresaste un correo incorrecto?{" "}
+          <Link
+            href="/register"
+            className="font-medium text-primary hover:underline transition-all"
+          >
+            Volver a registrarse
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}

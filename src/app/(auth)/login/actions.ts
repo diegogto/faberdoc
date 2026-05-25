@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient, getRequestOrigin } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email";
-import { getRecoveryEmailHtml } from "@/lib/email-templates";
+import { getRecoveryEmailHtml, getWelcomeEmailHtml } from "@/lib/email-templates";
 
 export async function loginAction(formData: FormData) {
   const supabase = await createClient();
@@ -32,8 +32,6 @@ export async function loginAction(formData: FormData) {
 }
 
 export async function signupAction(formData: FormData) {
-  const supabase = await createClient();
-
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const confirmPassword = formData.get("confirm_password") as string;
@@ -43,25 +41,64 @@ export async function signupAction(formData: FormData) {
     redirect("/register?error=password-mismatch");
   }
 
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: { full_name: fullName },
-    },
-  });
+  let redirectToPath = "";
 
-  if (error) {
-    console.error("Supabase Auth Signup Error:", {
-      message: error.message,
-      status: error.status,
-      name: error.name,
+  try {
+    const adminSupabase = createAdminClient();
+    const origin = await getRequestOrigin();
+
+    // 1. Crear el usuario desconfirmado con el cliente admin para saltar el SMTP nativo de Supabase
+    const { data: userData, error: createError } = await adminSupabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: false,
+      user_metadata: { full_name: fullName }
     });
-    redirect("/register?error=signup");
+
+    if (createError) {
+      console.error("Supabase Admin Create User Error:", createError);
+      redirectToPath = "/register?error=signup";
+    } else {
+      // 2. Generar el enlace de registro/confirmación en Supabase
+      const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
+        type: "signup",
+        email: email,
+        password: password,
+      });
+
+      if (linkError || !linkData?.properties?.hashed_token || !linkData?.properties?.email_otp) {
+        console.error("Supabase Admin Generate Signup Link Error:", linkError);
+        redirectToPath = "/register?error=signup";
+      } else {
+        const hashedToken = linkData.properties.hashed_token;
+        const otpCode = linkData.properties.email_otp;
+        
+        // Enlace que apunta directamente a nuestro Route Handler confirm
+        const customActionLink = `${origin}/auth/confirm?token_hash=${hashedToken}&type=signup&next=/onboarding`;
+
+        // 3. Enviar el correo de bienvenida/confirmación usando Resend
+        const emailContent = getWelcomeEmailHtml(fullName, customActionLink, otpCode);
+
+        const emailResult = await sendEmail({
+          to: email,
+          subject: "Confirma tu cuenta - Faberdoc",
+          html: emailContent,
+        });
+
+        if (!emailResult.success) {
+          console.error("Error sending custom welcome email via Resend:", emailResult.error);
+        }
+        
+        redirectToPath = `/register/verify?email=${encodeURIComponent(email)}`;
+      }
+    }
+  } catch (err) {
+    console.error("Unexpected error in signupAction:", err);
+    redirectToPath = "/register?error=signup";
   }
 
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(redirectToPath);
 }
 
 export async function logoutAction() {
@@ -151,6 +188,33 @@ export async function verifyOtpAction(formData: FormData) {
 
   revalidatePath("/", "layout");
   redirect("/reset-password");
+}
+
+export async function verifySignupOtpAction(formData: FormData) {
+  const supabase = await createClient();
+  const email = formData.get("email") as string;
+  const token = formData.get("token") as string;
+
+  if (!email || !token) {
+    redirect(`/register/verify?email=${encodeURIComponent(email)}&error=invalid-fields`);
+  }
+
+  const { error } = await supabase.auth.verifyOtp({
+    email,
+    token,
+    type: "signup",
+  });
+
+  if (error) {
+    console.error("Supabase Auth Verify Signup OTP Error:", {
+      message: error.message,
+      status: error.status,
+    });
+    redirect(`/register/verify?email=${encodeURIComponent(email)}&error=invalid-code`);
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/");
 }
 
 export async function resetPasswordAction(formData: FormData) {

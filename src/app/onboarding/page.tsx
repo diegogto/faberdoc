@@ -85,11 +85,12 @@ export default async function OnboardingPage({ searchParams }: PageProps) {
     if (orgData) {
       existingOrg = orgData;
 
-      // Obtener compañeros o miembros para que puedan contactarles
+      // Obtener administradores de la organización para que puedan contactarles
       const { data: membersData } = await adminSupabase
         .from("users")
         .select("full_name")
         .eq("organization_id", orgData.id)
+        .eq("is_admin", true)
         .limit(5); // Limitar a los primeros 5 miembros para no saturar la UI
 
       if (membersData) {

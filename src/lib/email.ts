@@ -6,10 +6,14 @@ export async function sendEmail({
   to,
   subject,
   html,
+  cc,
+  bcc,
 }: {
   to: string;
   subject: string;
   html: string;
+  cc?: string | string[];
+  bcc?: string | string[];
 }) {
   const apiKey = process.env.SMTP_PASS;
   const fromEmail = process.env.SMTP_ADMIN_EMAIL || "no-reply@faberdoc.com";
@@ -20,6 +24,8 @@ export async function sendEmail({
     console.log("=== [EMAIL LOG (Desarrollo)] ===");
     console.log(`De: ${fromEmail}`);
     console.log(`Para: ${to}`);
+    if (cc) console.log(`CC: ${JSON.stringify(cc)}`);
+    if (bcc) console.log(`BCC: ${JSON.stringify(bcc)}`);
     console.log(`Asunto: ${subject}`);
     console.log(`Contenido HTML: \n${html}`);
     console.log("================================");
@@ -36,6 +42,8 @@ export async function sendEmail({
       body: JSON.stringify({
         from: `Faberdoc <${fromEmail}>`,
         to,
+        cc,
+        bcc,
         subject,
         html,
       }),

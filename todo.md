@@ -11,28 +11,33 @@
 - [x] Corrección de error de contexto en `DropdownMenuLabel` (Base UI compatibility)
 - [x] Onboarding completo: Registro -> Creación de organización (`organizations`) -> Asignación de rol (con prevención de duplicados corporativos por dominio y bypass de sucursal)
 - [x] Control de Suscripción en Onboarding (crear registro en `subscriptions` con plan default 'FREE')
+- [x] BUG: Al registrar un nuevo usuario, sólo se muestra el aviso de revisar el correo pero no se redirige automáticamente a la página para ingresar el código OTP. Debería redirigir a la vista de confirmación informando que se envió un código o puede seguir el link del correo.
+- [x] MEJORA: En el flujo de onboarding de un nuevo miembro para una organización existente (por coincidencia de dominio), sólo se deben listar los usuarios administradores (ADMIN) de dicha organización para solicitarles acceso.
 
 ## III. Panel de Control y Proyectos
-- [ ] Dashboard Principal de Usuario (resumen de tareas pendientes, últimas emisiones)
-- [ ] Módulo de Proyectos: Creación, asignación de miembros (`project_members`) y roles (ADMIN, REVIEWER, etc.)
+- [x] Dashboard Principal de Usuario (resumen de tareas pendientes, últimas emisiones)
+- [x] Módulo de Proyectos: Creación, asignación de miembros (`project_members`) y roles (ADMIN, REVIEWER, etc.)
 - [x] Configuración del Naming Engine (patrón dinámico como `{PROY}-{ESP}-{NUM}`)
+- [x] Optimizar la vista de configuración de un proyecto (hacerla más amigable, explicativa y dinámica)
+  - [x] Rediseñar el configurador de código de documento (Naming Engine) para evitar el ingreso manual de brackets (`{...}`) mediante una interfaz visual con chips o constructores de patrones interactivos
 
 ## IV. Master Delivery List (MDL)
 - [x] Tabla principal interactiva (TanStack Table v8 + TanStack Query)
 - [x] Filtros avanzados y ordenamiento por metadatos dinámicos
 - [x] Carga masiva de MDL mediante importación (CSV/Excel)
 - [x] Panel lateral (Sheet/Drawer) para inspeccionar metadatos y línea de tiempo de revisiones sin perder contexto
+- [x] Habilitar la modificación del ancho del sidebar (panel lateral/Sheet) del documento
 
 ## V. Control de Revisiones y Almacenamiento
 - [ ] Carga de archivos a Supabase Storage con subida directa y segura
-- [ ] Generación de URLs firmadas (Presigned URLs) con expiración corta para descarga
-- [ ] Lógica de versionamiento dinámico (`version_index` y `version_label`)
+- [x] Generación de URLs firmadas (Presigned URLs) con expiración corta para descarga
+- [x] Lógica de versionamiento dinámico (`version_index` y `version_label`)
 
 ## VI. Registro de Emisiones y Transmittals
-- [ ] Emisiones Formales (Transmittals) y asociación inmutable a revisiones
+- [x] Emisiones Formales (Transmittals) y asociación inmutable a revisiones
 - [ ] Control de fechas estimadas vs reales en `issuance_logs` (reprogramaciones automáticas)
 - [ ] Importación y extracción de comentarios formales de revisión sobre PDF
-- [ ] Lógica de arrastre de comentarios abiertos (`OPEN`) a la siguiente revisión
+- [x] Lógica de arrastre de comentarios abiertos (`OPEN`) a la siguiente revisión
 
 ## VII. Monetización y Límites (Monetization Backbone)
 - [ ] Validación de límites de proyectos activos y espacio en disco en base de datos/backend
@@ -46,6 +51,13 @@
 - [x] Integración de Resend SMTP para envío de correos transaccionales (invitaciones y recuperación)
 - [x] Gestión organizativa en `/settings` (miembros, roles, invitaciones y solicitudes de acceso)
 - [x] Onboarding adaptativo con flujos de unirse por invitación, solicitar acceso o bypass de dominio
+- [x] BUG: Cuando un usuario solicita ser agregado a la organización, en la sección de solicitudes de acceso del panel del administrador sólo aparece "usuario" genérico sin detalles adicionales (como nombre o correo electrónico).
+- [x] BUG: Cuando el administrador acepta una solicitud de acceso, la acción no tiene efecto (el usuario aceptado no se incorpora ni aparece en la lista de miembros de la organización).
 
 ## IX. Plantillas de Correo e Imagen de Marca
 - [ ] Diseñar formatos HTML atractivos y profesionales para los correos (registro de usuario, invitaciones de equipo, recuperación de contraseña, etc.)
+
+## X. Backlog (Futuras Mejoras & Características Premium)
+- [x] Línea de tiempo (Timeline) global: Vista general en pantalla principal para el historial de actividad y trazabilidad de documentos (en lugar del drawer)
+- [ ] Time Tracker (Premium): Registro de tiempos de trabajo por documento (elaboración, revisión, etc.)
+

@@ -11,7 +11,7 @@ export type ProjectMemberRole =
   | "OWNER_APPROVER"
   | "VIEWER";
 
-export type RevisionStatus = "DRAFT" | "IN_REVIEW" | "APPROVED" | "ISSUED";
+export type RevisionStatus = "DRAFT" | "IN_REVIEW" | "COMMENTED" | "APPROVED" | "ISSUED";
 
 export type CommentStatus = "OPEN" | "RESPONDED" | "CLOSED";
 

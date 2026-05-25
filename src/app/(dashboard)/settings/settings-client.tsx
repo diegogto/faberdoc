@@ -26,6 +26,7 @@ import {
   removeUserFromOrgAction,
   inviteUserAction,
   handleJoinRequestAction,
+  updateOrganizationAction,
 } from "./actions";
 
 interface SettingsClientProps {
@@ -40,6 +41,7 @@ interface SettingsClientProps {
   organization: {
     id: string;
     name: string;
+    logo_url?: string | null;
   };
   orgUsers: Array<{
     id: string;
@@ -166,6 +168,35 @@ export function SettingsClient({
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  // Configuración de Organización (Admins)
+  const [orgUpdatePending, startOrgUpdateTransition] = useTransition();
+  const [orgUpdateMessage, setOrgUpdateMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  const handleUpdateOrganization = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setOrgUpdateMessage(null);
+    const formData = new FormData(e.currentTarget);
+
+    startOrgUpdateTransition(async () => {
+      const res = await updateOrganizationAction(formData);
+      if (res.success) {
+        setOrgUpdateMessage({
+          type: "success",
+          text: "Configuración de la organización actualizada.",
+        });
+        router.refresh();
+      } else {
+        setOrgUpdateMessage({
+          type: "error",
+          text: res.error || "Error al actualizar la organización.",
+        });
+      }
+    });
+  };
 
   // Invitación
   const [inviteEmail, setInviteEmail] = useState("");
@@ -562,6 +593,84 @@ export function SettingsClient({
 
             {/* Columna de Admin: Invitaciones e Ingresos */}
             <div className="lg:col-span-1 space-y-6">
+              {/* Configuración de la Organización (Solo Admins) */}
+              {currentUser.is_admin && (
+                <div className="bg-card border border-border rounded-xl p-6 space-y-6">
+                  <div>
+                    <h3 className="font-bold text-base text-foreground">
+                      Configuración de la Organización
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Actualiza el nombre y el logotipo de tu organización.
+                    </p>
+                  </div>
+
+                  {orgUpdateMessage && (
+                    <div
+                      className={`rounded-lg border p-3 text-sm text-center font-medium ${
+                        orgUpdateMessage.type === "success"
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : "border-destructive/30 bg-destructive/10 text-destructive"
+                      }`}
+                    >
+                      {orgUpdateMessage.text}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleUpdateOrganization} className="space-y-4">
+                    <div className="space-y-2">
+                      <label htmlFor="org_name" className="text-xs font-medium">
+                        Nombre de la Organización
+                      </label>
+                      <Input
+                        id="org_name"
+                        name="name"
+                        required
+                        defaultValue={organization.name}
+                        placeholder="Ej. Mi Empresa S.A."
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label htmlFor="org_logo_url" className="text-xs font-medium">
+                        URL del Logotipo (HTTPS)
+                      </label>
+                      <Input
+                        id="org_logo_url"
+                        name="logo_url"
+                        type="url"
+                        defaultValue={organization.logo_url || ""}
+                        placeholder="https://ejemplo.com/logo.png"
+                      />
+                      {organization.logo_url && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="text-[10px] text-muted-foreground">Vista previa:</span>
+                          <img
+                            src={organization.logo_url}
+                            alt="Logo org"
+                            className="h-8 max-w-[120px] object-contain border rounded p-1 bg-white"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full text-xs font-semibold"
+                      disabled={orgUpdatePending}
+                    >
+                      {orgUpdatePending && (
+                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                      )}
+                      Guardar Cambios
+                    </Button>
+                  </form>
+                </div>
+              )}
+
               {/* Formulario Invitar Usuario */}
               {currentUser.is_admin && (
                 <div className="bg-card border border-border rounded-xl p-6 space-y-6">

@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS organizations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
     email_domain VARCHAR(255),
+    logo_url TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
@@ -61,6 +62,8 @@ CREATE TABLE IF NOT EXISTS projects (
     organization_id UUID REFERENCES organizations(id),
     name VARCHAR(255) NOT NULL,
     naming_pattern VARCHAR(255) NOT NULL,
+    versioning_logic VARCHAR(50) DEFAULT 'MIXED' CHECK (versioning_logic IN ('MIXED', 'SEPARATE_EMISSION')),
+    review_flow_config JSONB DEFAULT '{}'::JSONB,
     custom_properties_definition JSONB NOT NULL DEFAULT '[]'::JSONB,
     client_info JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -71,7 +74,7 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS project_members (
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    role VARCHAR(50) NOT NULL CHECK (role IN ('ADMIN', 'REVIEWER', 'OWNER_APPROVER', 'VIEWER')),
+    role VARCHAR(50) NOT NULL CHECK (role IN ('ADMIN', 'COORDINATOR', 'REVIEWER', 'OWNER_APPROVER', 'VIEWER')),
     PRIMARY KEY (project_id, user_id)
 );
 
@@ -97,7 +100,9 @@ CREATE TABLE IF NOT EXISTS revisions (
     uploader_id UUID REFERENCES users(id) NOT NULL,
     version_label VARCHAR(20) NOT NULL,
     version_index INTEGER NOT NULL,
-    status VARCHAR(50) NOT NULL CHECK (status IN ('DRAFT', 'IN_REVIEW', 'APPROVED', 'ISSUED')),
+    status VARCHAR(50) NOT NULL CHECK (status IN ('DRAFT', 'IN_REVIEW', 'COMMENTED', 'APPROVED', 'ISSUED')),
+    emission_code VARCHAR(50),
+    comment_level VARCHAR(20) CHECK (comment_level IN ('MINOR', 'MAJOR')),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

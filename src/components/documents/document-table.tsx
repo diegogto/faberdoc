@@ -283,6 +283,13 @@ export function DocumentTable({
         documentDetail={selectedDocumentDetail}
         isOpen={isDrawerOpen}
         onClose={handleDrawerClose}
+        projectId={projectId}
+        onRefresh={() => {
+          if (selectedDocumentDetail) {
+            handleRowClick(selectedDocumentDetail.document.id);
+          }
+          router.refresh();
+        }}
       />
 
       {/* Modal: Crear Documento */}

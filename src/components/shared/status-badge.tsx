@@ -27,6 +27,11 @@ const STATUS_CONFIG: Record<
     className:
       "bg-[var(--status-issued-bg)] text-[var(--status-issued)] border-[var(--status-issued)]/20 hover:bg-[var(--status-issued-bg)]",
   },
+  COMMENTED: {
+    label: "Comentado",
+    className:
+      "bg-orange-50 text-orange-700 border-orange-200/50 dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-900/30 hover:bg-orange-50",
+  },
   OPEN: {
     label: "Abierto",
     className:

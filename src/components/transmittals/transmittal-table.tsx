@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   useReactTable,
   getCoreRowModel,
@@ -23,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/empty-state";
 import { ArrowUpDown, Search, Send, Plus } from "lucide-react";
 import type { TransmittalTableRow } from "@/lib/types";
+import { CreateTransmittalDialog } from "./create-transmittal-dialog";
+
 
 const transmittalColumns: ColumnDef<TransmittalTableRow>[] = [
   {
@@ -111,11 +114,15 @@ const transmittalColumns: ColumnDef<TransmittalTableRow>[] = [
 
 interface TransmittalTableProps {
   data: TransmittalTableRow[];
+  projectId: string;
+  versioningLogic: string;
 }
 
-export function TransmittalTable({ data }: TransmittalTableProps) {
+export function TransmittalTable({ data, projectId, versioningLogic }: TransmittalTableProps) {
+  const router = useRouter();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const table = useReactTable({
     data,
@@ -144,7 +151,7 @@ export function TransmittalTable({ data }: TransmittalTableProps) {
         <span className="text-xs text-muted-foreground ml-auto">
           {table.getFilteredRowModel().rows.length} envíos
         </span>
-        <Button size="sm" className="gap-1.5 h-8">
+        <Button size="sm" className="gap-1.5 h-8" onClick={() => setIsCreateOpen(true)}>
           <Plus className="h-3.5 w-3.5" />
           Nuevo Envío
         </Button>
@@ -209,6 +216,14 @@ export function TransmittalTable({ data }: TransmittalTableProps) {
           </TableBody>
         </Table>
       </div>
+
+      <CreateTransmittalDialog
+        projectId={projectId}
+        versioningLogic={versioningLogic}
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        onSuccess={() => router.refresh()}
+      />
     </div>
   );
 }

@@ -95,11 +95,14 @@ CREATE TABLE projects (
     organization_id UUID REFERENCES organizations(id),
     name VARCHAR(255) NOT NULL,
     naming_pattern VARCHAR(255) NOT NULL,
+    versioning_logic VARCHAR(50) DEFAULT 'MIXED' CHECK (versioning_logic IN ('MIXED', 'SEPARATE_EMISSION')),
+    review_flow_config JSONB DEFAULT '{}'::JSONB,
     custom_properties_definition JSONB NOT NULL,
     client_info JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
 );
+
 
 CREATE TABLE project_members (
     project_id UUID REFERENCES projects(id),
@@ -128,7 +131,9 @@ CREATE TABLE revisions (
     uploader_id UUID REFERENCES users(id) NOT NULL,
     version_label VARCHAR(20) NOT NULL,
     version_index INTEGER NOT NULL,
-    status VARCHAR(50) NOT NULL,
+    emission_code VARCHAR(50),
+    status VARCHAR(50) NOT NULL CHECK (status IN ('DRAFT', 'IN_REVIEW', 'COMMENTED', 'APPROVED', 'ISSUED')),
+    comment_level VARCHAR(20) CHECK (comment_level IN ('MINOR', 'MAJOR')),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -179,7 +184,17 @@ CREATE TABLE comments (
 1. **Onboarding / Auth:** Login vía Supabase. Si la organización tiene su suscripción en PAST\_DUE, el sistema entra en modo "Read-Only".
 2. **Dashboard de Usuario:** Cruce de datos entre issuance\_logs, revisions (status) y project\_members para listar "Mis tareas pendientes" (Documentos por subir, aprobar o responder).
 3. **Master Delivery List (MDL):** Tabla interactiva principal. Al hacer click en una fila, se abre un Sheet (Drawer lateral) mostrando los metadatos JSONB y la línea de tiempo de revisiones.
-4. **Flujo de Revisión y Cierre:** Carga de documento \-\> Revisión interna \-\> Aprobación \-\> Creación de Transmittal \-\> El cliente externo recibe, descarga, comenta \-\> Se cargan los comentarios (status OPEN) \-\> Se "arrastran" los comentarios abiertos a la siguiente versión hasta su cierre (CLOSED).
+4. **Flujo de Revisión, Aprobación y Emisión (Transmittal):**
+   - **Carga de Archivo (Upload):** El usuario sube el archivo a un adaptador de almacenamiento abstracto (`StorageService`). Esto permite cambiar de proveedor de almacenamiento (Supabase Storage, S3, etc.) de manera modular sin tocar el código del frontend.
+   - **Estados del Documento:**
+     - **Estado Interno:** Sigue el flujo de control documental del proyecto (ej: `DRAFT` -> `IN_REVIEW` -> `APPROVED`). Es gestionado internamente por el equipo.
+     - **Estado Externo (Emisión):** Representa el estado de emisión formal a terceros, indicado por la versión y el código del Transmittal al pasar la revisión a `ISSUED`.
+   - **Lógicas de Versionamiento (Configurables por Proyecto al crearlo/configurarlo):**
+     - **Lógica 1 (MIXED):** El documento avanza secuencialmente en letras (`A` -> `B` -> `C`...) mientras se encuentra en estado interno (borradores/revisiones internas). En el momento en que se aprueba y emite formalmente a través de un Transmittal, la versión del documento cambia/inicia con un número (ej. `0` o `01`), y las subsiguientes actualizaciones avanzan numéricamente (`1`, `2`... o `02`, `03`...).
+     - **Lógica 2 (SEPARATE_EMISSION):** El documento avanza numéricamente en su versión/revisión interna de forma secuencial (`Rev 1` -> `Rev 2` -> `Rev 3`...) cada vez que se sube un nuevo archivo. Por separado, existe un código o etiqueta de emisión (`emission_code`) que representa el estado externo (ej. `A`, `B` o texto personalizado), el cual es indicado/asignado por el usuario en el momento de realizar el envío/Transmittal.
+   - **Transmittals:** Agrupación formal e inmutable de una o más revisiones aprobadas enviadas a una organización externa, lo que cambia automáticamente el estado de las revisiones de `APPROVED` a `ISSUED`.
+   - **Cierre de Comentarios:** Al generar una nueva revisión, todos los comentarios con estado `OPEN` de la versión anterior se copian automáticamente a la nueva versión.
+
 
 ## **7\. DESPLIEGUE Y DEVOPS (DOKPLOY)**
 

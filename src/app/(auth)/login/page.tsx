@@ -43,6 +43,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
         )}
 
+        {success === "signup-pending" && (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-600 dark:text-emerald-400 text-center font-medium">
+            Registro exitoso. Por favor revisa tu correo electrónico para confirmar tu cuenta.
+          </div>
+        )}
+
         {/* Login Form */}
         <form className="space-y-5">
           <div className="space-y-2">

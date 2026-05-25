@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { SettingsForm } from "./settings-form";
 
 interface SettingsPageProps {
   params: Promise<{ projectId: string }>;
@@ -13,7 +14,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
 
   const { data: project } = await supabase
     .from("projects")
-    .select("name, naming_pattern, custom_properties_definition, client_info")
+    .select("id, name, naming_pattern, versioning_logic, review_flow_config, custom_properties_definition, client_info")
     .eq("id", projectId)
     .is("deleted_at", null)
     .single();
@@ -31,51 +32,24 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-6 space-y-8">
-      {/* Project Info */}
+      {/* Project Info Settings Form */}
       <section>
-        <h2 className="text-lg font-semibold mb-4">Información del Proyecto</h2>
-        <div className="space-y-4">
-          <div className="grid grid-cols-[140px_1fr] gap-3 text-sm">
-            <span className="text-muted-foreground">Nombre</span>
-            <span className="font-medium">{project.name}</span>
-          </div>
-          <div className="grid grid-cols-[140px_1fr] gap-3 text-sm">
-            <span className="text-muted-foreground">Patrón de Código</span>
-            <code className="font-mono text-xs bg-muted px-2 py-1 rounded">
-              {project.naming_pattern}
-            </code>
-          </div>
-          {project.client_info && (
-            <>
-              <div className="grid grid-cols-[140px_1fr] gap-3 text-sm">
-                <span className="text-muted-foreground">Cliente</span>
-                <span>
-                  {(project.client_info as Record<string, string>).client_name ?? "—"}
-                </span>
-              </div>
-              <div className="grid grid-cols-[140px_1fr] gap-3 text-sm">
-                <span className="text-muted-foreground">Contrato</span>
-                <span>
-                  {(project.client_info as Record<string, string>).contract ?? "—"}
-                </span>
-              </div>
-            </>
-          )}
-        </div>
+        <h2 className="text-lg font-semibold mb-6">Información del Proyecto</h2>
+        <SettingsForm project={project} />
       </section>
 
       <Separator />
 
       {/* Dynamic Properties */}
       <section>
-        <h2 className="text-lg font-semibold mb-4">
+        <h2 className="text-lg font-semibold mb-4 font-sans text-zinc-900 dark:text-zinc-50">
           Propiedades Dinámicas (Campos JSONB)
         </h2>
         <div className="space-y-4">
           {customProperties.map((prop) => (
             <div
               key={prop.key}
-              className="rounded-lg border border-border p-4 space-y-2"
+              className="rounded-lg border border-border p-4 space-y-2 bg-zinc-50/50 dark:bg-zinc-900/30"
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">{prop.label}</span>
@@ -89,7 +63,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
               {prop.options && prop.options.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {prop.options.map((opt) => (
-                    <Badge key={opt} variant="outline" className="text-xs">
+                    <Badge key={opt} variant="outline" className="text-xs bg-white dark:bg-zinc-950">
                       {opt}
                     </Badge>
                   ))}

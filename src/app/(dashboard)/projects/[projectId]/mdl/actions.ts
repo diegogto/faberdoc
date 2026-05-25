@@ -74,7 +74,7 @@ async function verifyUserProjectAccess(projectId: string) {
     return { error: "No tienes permisos en este proyecto.", user: null };
   }
 
-  const allowedRoles = ["ADMIN", "REVIEWER", "OWNER_APPROVER"];
+  const allowedRoles = ["ADMIN", "COORDINATOR", "REVIEWER", "OWNER_APPROVER"];
   if (!allowedRoles.includes(member.role)) {
     return { error: "No tienes permisos de edición en este proyecto.", user: null };
   }

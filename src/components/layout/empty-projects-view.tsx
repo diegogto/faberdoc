@@ -1,19 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { FolderKanban, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { createProjectAction } from "@/app/(dashboard)/projects/actions";
+import { CreateProjectDialogContent } from "./create-project-dialog-content";
 
 interface EmptyProjectsViewProps {
   isAdmin: boolean;
@@ -22,33 +15,6 @@ interface EmptyProjectsViewProps {
 
 export function EmptyProjectsView({ isAdmin, userFullName }: EmptyProjectsViewProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [projectName, setProjectName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  const handleCreateProject = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!projectName.trim()) {
-      setError("El nombre del proyecto es requerido.");
-      return;
-    }
-
-    startTransition(async () => {
-      const formData = new FormData();
-      formData.append("name", projectName.trim());
-
-      const result = await createProjectAction(formData);
-
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setProjectName("");
-        setIsDialogOpen(false);
-      }
-    });
-  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-var(--topbar-height))] px-4 bg-background">
@@ -72,63 +38,16 @@ export function EmptyProjectsView({ isAdmin, userFullName }: EmptyProjectsViewPr
 
         {/* Dynamic Call to Action */}
         {isAdmin && (
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) {
-              setProjectName("");
-              setError(null);
-            }
-          }}>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger className="inline-flex h-9 gap-1.5 px-4 items-center justify-center rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/80 active:translate-y-px transition-all cursor-pointer shadow-sm hover:shadow duration-200">
               <Plus className="h-4 w-4" />
               Crear mi primer proyecto
             </DialogTrigger>
 
-            <DialogContent className="sm:max-w-[425px]">
-              <form onSubmit={handleCreateProject}>
-                <DialogHeader>
-                  <DialogTitle>Crear Nuevo Proyecto</DialogTitle>
-                  <DialogDescription>
-                    Ingresa el nombre de tu primer proyecto de ingeniería. Se creará con el formato estandarizado de Faberdoc.
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="grid gap-4 py-4">
-                  <div className="flex flex-col gap-2">
-                    <label htmlFor="name-landing" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Nombre del Proyecto
-                    </label>
-                    <Input
-                      id="name-landing"
-                      value={projectName}
-                      onChange={(e) => setProjectName(e.target.value)}
-                      placeholder="Ej. Proyecto Central Hidroeléctrica, Edificio Central..."
-                      disabled={isPending}
-                      autoFocus
-                    />
-                    {error && (
-                      <p className="text-xs font-medium text-destructive mt-1">
-                        {error}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsDialogOpen(false)}
-                    disabled={isPending}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={isPending}>
-                    {isPending ? "Creando..." : "Crear Proyecto"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
+            <CreateProjectDialogContent
+              onClose={() => setIsDialogOpen(false)}
+              description="Ingresa el nombre de tu primer proyecto de ingeniería. Se creará con el formato estandarizado de Faberdoc."
+            />
           </Dialog>
         )}
       </div>

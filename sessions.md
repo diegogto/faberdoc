@@ -135,3 +135,61 @@
 - **Compilación del Proyecto:**
   - Compilación del proyecto local verificada con éxito (`npm run build` completado con código de salida 0 y 0 errores).
 
+## [2026-05-23] Sesión 6: Ciclo de Vida Documental, Configuración de Proyectos y Transmittals
+**Hora:** 15:07 (Local Time)  
+**Objetivo:** Desarrollar e integrar el ciclo de vida de los documentos, comentarios técnicos de revisión, edición de configuración de proyectos, y la creación y emisión de Transmittals formales con conversiones de versionado.
+
+### 1. Cambios en Código (Next.js & Frontend)
+- **Control de Revisiones en DocumentDrawer:**
+  - Añadido soporte interactivo para subidas de archivos usando un almacenamiento abstracto agnóstico (`StorageService` y `LocalStorageService` mock).
+  - Implementado panel y botones contextuales para cambiar estados internos (`DRAFT` -> `IN_REVIEW` -> `APPROVED` o `COMMENTED` con nivel `MINOR`/`MAJOR`).
+  - Creada Server Action `createNextRevisionAction` para generar la siguiente revisión secuencial arrastrando automáticamente comentarios abiertos.
+- **Línea de Tiempo y Comentarios:**
+  - Habilitados enlaces directos para descarga de revisiones.
+  - Implementadas respuestas y cierres/resoluciones de comentarios técnicos directamente en `RevisionTimeline`.
+- **Configuración de Proyecto:**
+  - Creado formulario cliente `SettingsForm` y Server Action `updateProjectSettingsAction` para modificar nombre, patrón de código, lógica de versionado (`MIXED` / `SEPARATE_EMISSION`) y flujo de revisión de proyectos.
+- **Módulo de Transmittals:**
+  - Creado el diálogo `CreateTransmittalDialog` para seleccionar organizaciones destinatarias, filtrar y marcar documentos aprobados (`APPROVED`), e ingresar el código de emisión.
+  - Conectado el modal a la tabla principal `TransmittalTable` y el botón "Nuevo Envío".
+  - Implementada la conversión de versión inmutable al emitir (`Rev A` a `Rev 0` en lógica `MIXED`, y tag manual en `SEPARATE_EMISSION`).
+
+### 2. Cambios en Base de Datos
+- Sincronizado `supabase/schema.sql` para reflejar las columnas añadidas en la migración `20260523_versioning_and_storage.sql` (`versioning_logic`, `review_flow_config` en `projects` y `emission_code`, `comment_level` en `revisions`).
+- Aplicada y verificada la migración `migration_settings_org.sql` de forma directa en el contenedor de base de datos del VPS.
+
+### 3. Plan de Control e Integridad
+- **Prueba en Vivo (E2E):**
+  - Ejecutada verificación completa usando `browser_subagent` logrando de manera exitosa inicio de sesión, creación de proyecto, creación de documento, carga de archivo PDF, cambio de estados, guardado de configuraciones y emisión formal del transmittal.
+- **Compilación de Producción:**
+  - Ejecutado `npm run build` finalizando con éxito total y 0 advertencias o errores.
+
+## [2026-05-25] Sesión 7: Corrección de Onboarding, Solicitud y Aprobación de Acceso a Organizaciones
+**Hora:** 03:20 (Local Time)  
+**Objetivo:** Resolver los bugs críticos en los flujos de onboarding y solicitudes de acceso: redirección al registrarse con OTP pendiente, filtrar la lista de miembros en el onboarding para mostrar sólo administradores, corregir la visualización del nombre y correo en la sección de solicitudes del panel de administración, e implementar la acción de aprobación que vincula correctamente al nuevo usuario a la organización.
+
+### 1. Cambios en Código (Next.js & Frontend)
+- **Redirección de Registro y OTP:**
+  - Modificada la acción de signup `signupAction` en `src/app/(auth)/login/actions.ts` para redirigir a `/register?email=...` tras registrar un usuario no verificado en Supabase.
+  - Implementada la redirección automática a la vista de ingreso del código de verificación con un banner explicativo claro, evitando que el usuario se quede varado en la pantalla de registro.
+- **Filtro de Privacidad en Onboarding:**
+  - Modificado `src/app/onboarding/page.tsx` para obtener sólo los usuarios administradores (`is_admin: true`) de la organización que coincide con el dominio corporativo del usuario, ocultando otros colaboradores.
+- **Visualización Completa del Solicitante en Panel Administrativo:**
+  - Corregido el bug en la pestaña "Mi Organización" de `/settings` (`settings-client.tsx` y `page.tsx`). Ahora las solicitudes de acceso pendientes muestran la información de usuario unida (`users(full_name, email)`) en lugar de mostrar "Usuario" genérico.
+- **Aprobación de Solicitudes y Redirección Bypass:**
+  - Modificada la Server Action `handleJoinRequestAction` en `src/app/(dashboard)/settings/actions.ts` para asociar directamente el `organization_id` al usuario en la tabla `users` y cambiar el estado de la solicitud en `join_requests` a `APPROVED`.
+  - Asegurada la revalidación de ruta y refresco del cliente para reflejar de inmediato al nuevo miembro en la lista.
+  - El usuario aprobado ahora puede iniciar sesión e ingresar directamente al dashboard raíz `/`, ya que el sistema detecta su vinculación a la organización y omite la página de onboarding.
+
+### 2. Cambios en Base de Datos e Integridad
+- Ejecutado script de actualización de contraseñas de prueba en base de datos.
+- Reseteado el estado de Ayrton Senna en la base de datos para pruebas limpias.
+
+### 3. Plan de Control e Integridad
+- **Prueba E2E Completa (Browser Subagent):**
+  - Ejecutada prueba en vivo de punta a punta: Ayrton Senna se registra, ve el dominio coincidente (con Diego Moreno de administrador), solicita acceso, el administrador Diego Moreno inicia sesión, despliega la sección de solicitudes desplazándose verticalmente por la página, aprueba la solicitud, y Ayrton Senna ingresa directamente al dashboard sin redirección a onboarding.
+- **Compilación de Producción:**
+  - Compilado localmente con éxito total (`npm run build` completado exitosamente y con 0 errores).
+
+
+

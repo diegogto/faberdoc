@@ -166,16 +166,6 @@ export async function completeOnboardingAction(prevState: any, formData: FormDat
   redirect("/");
 }
 
-/**
- * Server Action para cerrar sesión
- */
-export async function logoutAction() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
-  revalidatePath("/", "layout");
-  redirect("/login");
-}
-
 export async function joinExistingOrgAction(orgId: string) {
   try {
     const userSupabase = await createClient();
@@ -187,16 +177,34 @@ export async function joinExistingOrgAction(orgId: string) {
     // 1. Verificar si ya existe una solicitud de este usuario
     const { data: existing } = await adminSupabase
       .from("join_requests")
-      .select("id")
+      .select("id, status")
       .eq("user_id", authUser.id)
       .eq("organization_id", orgId)
       .maybeSingle();
 
     if (existing) {
-      return { error: "Ya tienes una solicitud pendiente para unirte a esta organización." };
+      if (existing.status === "PENDING") {
+        return { error: "Ya tienes una solicitud pendiente para unirte a esta organización." };
+      }
+
+      // Si existe pero no está PENDING (es APPROVED o REJECTED), la actualizamos a PENDING
+      const { error: updateError } = await adminSupabase
+        .from("join_requests")
+        .update({
+          status: "PENDING",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", existing.id);
+
+      if (updateError) {
+        return { error: `No se pudo actualizar la solicitud. Detalle: ${updateError.message}` };
+      }
+
+      revalidatePath("/onboarding");
+      return { success: true };
     }
 
-    // 2. Insertar solicitud
+    // 2. Insertar solicitud nueva
     const { error } = await adminSupabase
       .from("join_requests")
       .insert({

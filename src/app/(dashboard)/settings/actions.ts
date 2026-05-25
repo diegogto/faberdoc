@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { createClient, getRequestOrigin } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/email";
 import { getInviteEmailHtml } from "@/lib/email-templates";
@@ -122,7 +123,7 @@ export async function updatePasswordAction(formData: FormData) {
 export async function changeUserRoleAction(targetUserId: string, isAdmin: boolean) {
   try {
     const { organizationId, callerId } = await checkCallerIsAdmin();
-    const supabase = await createClient();
+    const adminSupabase = createAdminClient();
 
     // Evitar que el administrador se quite permisos a sí mismo
     if (targetUserId === callerId) {
@@ -132,7 +133,7 @@ export async function changeUserRoleAction(targetUserId: string, isAdmin: boolea
       };
     }
 
-    const { error } = await supabase
+    const { error } = await adminSupabase
       .from("users")
       .update({ is_admin: isAdmin })
       .eq("id", targetUserId)
@@ -155,7 +156,7 @@ export async function changeUserRoleAction(targetUserId: string, isAdmin: boolea
 export async function removeUserFromOrgAction(targetUserId: string) {
   try {
     const { organizationId, callerId } = await checkCallerIsAdmin();
-    const supabase = await createClient();
+    const adminSupabase = createAdminClient();
 
     // Evitar que el administrador se elimine a sí mismo
     if (targetUserId === callerId) {
@@ -167,7 +168,7 @@ export async function removeUserFromOrgAction(targetUserId: string) {
 
     // 1. Eliminar membresías de proyectos de la organización
     // Primero, obtener los IDs de los proyectos de la organización
-    const { data: orgProjects } = await supabase
+    const { data: orgProjects } = await adminSupabase
       .from("projects")
       .select("id")
       .eq("organization_id", organizationId);
@@ -175,7 +176,7 @@ export async function removeUserFromOrgAction(targetUserId: string) {
     const projectIds = (orgProjects ?? []).map((p) => p.id);
 
     if (projectIds.length > 0) {
-      await supabase
+      await adminSupabase
         .from("project_members")
         .delete()
         .eq("user_id", targetUserId)
@@ -183,7 +184,7 @@ export async function removeUserFromOrgAction(targetUserId: string) {
     }
 
     // 2. Remover al usuario de la organización
-    const { error } = await supabase
+    const { error } = await adminSupabase
       .from("users")
       .update({ organization_id: null, is_admin: false })
       .eq("id", targetUserId)
@@ -256,15 +257,16 @@ export async function inviteUserAction(email: string, isAdmin: boolean) {
 
     const { data: orgInfo } = await supabase
       .from("organizations")
-      .select("name")
+      .select("name, logo_url")
       .eq("id", organizationId)
       .single();
 
     const orgName = orgInfo?.name ?? "Faberdoc Organization";
+    const logoUrl = orgInfo?.logo_url || null;
     const roleLabel = validated.data.is_admin ? "Administrador" : "Colaborador";
     const registerLink = `${origin}/register`;
 
-    const emailContent = getInviteEmailHtml(orgName, roleLabel, registerLink);
+    const emailContent = getInviteEmailHtml(orgName, roleLabel, registerLink, logoUrl);
 
     const emailResult = await sendEmail({
       to: validated.data.email.toLowerCase(),
@@ -286,10 +288,10 @@ export async function inviteUserAction(email: string, isAdmin: boolean) {
 export async function handleJoinRequestAction(requestId: string, approve: boolean) {
   try {
     const { organizationId } = await checkCallerIsAdmin();
-    const supabase = await createClient();
+    const adminSupabase = createAdminClient();
 
     // Obtener información de la solicitud
-    const { data: request, error: fetchError } = await supabase
+    const { data: request, error: fetchError } = await adminSupabase
       .from("join_requests")
       .select("*, users(full_name, email)")
       .eq("id", requestId)
@@ -302,7 +304,7 @@ export async function handleJoinRequestAction(requestId: string, approve: boolea
 
     if (approve) {
       // 1. Vincular al usuario a la organización
-      const { error: userUpdateError } = await supabase
+      const { error: userUpdateError } = await adminSupabase
         .from("users")
         .update({ organization_id: organizationId })
         .eq("id", request.user_id);
@@ -312,13 +314,13 @@ export async function handleJoinRequestAction(requestId: string, approve: boolea
       }
 
       // 2. Marcar la solicitud como APPROVED
-      await supabase
+      await adminSupabase
         .from("join_requests")
         .update({ status: "APPROVED" })
         .eq("id", requestId);
     } else {
       // Marcar la solicitud como REJECTED
-      await supabase
+      await adminSupabase
         .from("join_requests")
         .update({ status: "REJECTED" })
         .eq("id", requestId);
@@ -330,3 +332,51 @@ export async function handleJoinRequestAction(requestId: string, approve: boolea
     return { success: false, error: err.message || "Error inesperado" };
   }
 }
+
+const updateOrganizationSchema = z.object({
+  name: z.string().min(2, "El nombre de la organización debe tener al menos 2 caracteres").max(100),
+  logo_url: z.string().url("URL de logo inválida").or(z.literal("")).nullable(),
+});
+
+/**
+ * Actualiza los datos de la organización (nombre y URL del logo).
+ */
+export async function updateOrganizationAction(formData: FormData) {
+  try {
+    const { organizationId } = await checkCallerIsAdmin();
+    const supabase = await createClient();
+
+    const name = formData.get("name") as string;
+    const logoUrl = formData.get("logo_url") as string;
+
+    const validated = updateOrganizationSchema.safeParse({
+      name,
+      logo_url: logoUrl ? logoUrl.trim() : null,
+    });
+
+    if (!validated.success) {
+      return {
+        success: false,
+        error: validated.error.issues[0].message,
+      };
+    }
+
+    const { error } = await supabase
+      .from("organizations")
+      .update({
+        name: validated.data.name,
+        logo_url: validated.data.logo_url,
+      })
+      .eq("id", organizationId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath("/settings");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Error inesperado" };
+  }
+}
+

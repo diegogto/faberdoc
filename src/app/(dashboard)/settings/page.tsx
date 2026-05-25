@@ -37,7 +37,7 @@ export default async function SettingsPage() {
   // 3. Obtener organización
   const { data: organization, error: orgError } = await supabase
     .from("organizations")
-    .select("id, name")
+    .select("id, name, logo_url")
     .eq("id", userProfile.organization_id)
     .single();
 

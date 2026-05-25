@@ -12,7 +12,16 @@ export default async function TransmittalsPage({
   const { projectId } = await params;
   const supabase = await createClient();
 
-  // Obtener transmittals del proyecto con conteo de items y datos del sender/recipient
+  // 1. Obtener la configuración de versionado del proyecto
+  const { data: project } = await supabase
+    .from("projects")
+    .select("versioning_logic")
+    .eq("id", projectId)
+    .single();
+
+  const versioningLogic = project?.versioning_logic ?? "MIXED";
+
+  // 2. Obtener transmittals del proyecto con conteo de items y datos del sender/recipient
   const { data: rawTransmittals } = await supabase
     .from("transmittals")
     .select(
@@ -47,7 +56,11 @@ export default async function TransmittalsPage({
 
   return (
     <div className="h-full flex flex-col">
-      <TransmittalTable data={transmittals} />
+      <TransmittalTable
+        data={transmittals}
+        projectId={projectId}
+        versioningLogic={versioningLogic}
+      />
     </div>
   );
 }

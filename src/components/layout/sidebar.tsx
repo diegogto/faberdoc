@@ -21,17 +21,11 @@ import {
 } from "@/components/ui/tooltip";
 import {
   Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { ProjectWithRole, User } from "@/lib/types";
-import { createProjectAction } from "@/app/(dashboard)/projects/actions";
+import { CreateProjectDialogContent } from "./create-project-dialog-content";
 
 interface SidebarProps {
   projects: ProjectWithRole[];
@@ -44,9 +38,6 @@ export function Sidebar({ projects, organizationName, user }: SidebarProps) {
   const pathname = usePathname();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [projectName, setProjectName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
 
   const ownProjects = projects.filter((p) => p.is_own_organization);
   const externalProjects = projects.filter((p) => !p.is_own_organization);
@@ -54,38 +45,8 @@ export function Sidebar({ projects, organizationName, user }: SidebarProps) {
   const isProjectActive = (projectId: string) =>
     pathname.startsWith(`/projects/${projectId}`);
 
-  const handleCreateProject = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!projectName.trim()) {
-      setError("El nombre del proyecto es requerido.");
-      return;
-    }
-
-    startTransition(async () => {
-      const formData = new FormData();
-      formData.append("name", projectName.trim());
-
-      const result = await createProjectAction(formData);
-
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setProjectName("");
-        setIsDialogOpen(false);
-      }
-    });
-  };
-
   return (
-    <Dialog open={isDialogOpen} onOpenChange={(open) => {
-      setIsDialogOpen(open);
-      if (!open) {
-        setProjectName("");
-        setError(null);
-      }
-    }}>
+    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <aside
         className={cn(
           "sidebar-transition relative flex flex-col border-r border-border bg-sidebar h-full",
@@ -188,52 +149,7 @@ export function Sidebar({ projects, organizationName, user }: SidebarProps) {
       </aside>
 
       {/* Modal Dialog Content for Creating Project */}
-      <DialogContent className="sm:max-w-[425px]">
-        <form onSubmit={handleCreateProject}>
-          <DialogHeader>
-            <DialogTitle>Crear Nuevo Proyecto</DialogTitle>
-            <DialogDescription>
-              Ingresa el nombre del proyecto. Se creará con la codificación estándar y especialidades predefinidas.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="grid gap-4 py-4">
-            <div className="flex flex-col gap-2">
-              <label htmlFor="name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Nombre del Proyecto
-              </label>
-              <Input
-                id="name"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                placeholder="Ej. Edificio Costanera, Planta Solar..."
-                className="col-span-3"
-                disabled={isPending}
-                autoFocus
-              />
-              {error && (
-                <p className="text-xs font-medium text-destructive mt-1">
-                  {error}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsDialogOpen(false)}
-              disabled={isPending}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isPending}>
-              {isPending ? "Creando..." : "Crear Proyecto"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
+      <CreateProjectDialogContent onClose={() => setIsDialogOpen(false)} />
     </Dialog>
   );
 }
