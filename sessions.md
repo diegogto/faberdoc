@@ -192,4 +192,34 @@
   - Compilado localmente con éxito total (`npm run build` completado exitosamente y con 0 errores).
 
 
+## [2026-05-25] Sesión 8: Integración de Logo, Paleta de Colores de Marca y Corrección de Hidratación (Hydration Mismatch)
+**Hora:** 22:43 (Local Time)  
+**Objetivo:** Integrar el nuevo logotipo oficial en formato SVG a lo largo de toda la plataforma, adaptar los tokens globales de color en modo claro y oscuro, ajustar las plantillas HTML de correo transaccional a la identidad de la marca, y solucionar los fallos de hidratación de fechas localizadas.
 
+### 1. Cambios en Código (Next.js & Styling)
+- **Activos de Marca:**
+  - Guardado el logotipo SVG en [[logo.svg](file:///home/diegogto/Documents/Projects/Faberdoc/public/logo.svg)].
+  - Creado el componente React [[logo.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/ui/logo.tsx)] que contiene los paths en línea del logotipo e isotipo. Soporta `iconOnly` (que modifica el `viewBox` para mostrar solo los 3 folios cuando la barra lateral se colapsa) y clases responsivas de modo claro y oscuro.
+  - Reemplazados los iconos de marca provisorios por el componente `<Logo />` en [[sidebar.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/layout/sidebar.tsx)] (escalado a 1.5x / `h-9` en expandido y `h-[33px]` en colapsado), [[login/page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/login/page.tsx)] (escalado a 2.0x / `h-20`), [[register/page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/register/page.tsx)] (escalado a 2.0x / `h-20`), y [[onboarding-client.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/onboarding/onboarding-client.tsx)] (escalado a 2.0x / `h-20`).
+- **Paleta de Colores Global (globals.css):**
+  - Modificado [[globals.css](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/globals.css)] para incorporar los colores corporativos oficiales:
+    - *Modo Claro*: `--primary` ahora apunta al Faber Navy (`oklch(0.32 0.045 250)`), `--ring` al Doc Medium Blue (`oklch(0.48 0.10 250)`), y grises y fondos secundarios calculados para máxima sintonía.
+    - *Modo Oscuro*: `--background` pasa a un navy-gris oscuro premium (`oklch(0.18 0.015 250)`) y `--primary` al Soft Steel Blue (`oklch(0.74 0.05 250)`) para legibilidad.
+- **Plantillas de Correo (email-templates.ts):**
+  - Modificado [[email-templates.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/lib/email-templates.ts)] para colorear los fallbacks de texto imitando la marca (`<span style="color: #2e3e56;">Faber</span><span style="color: #8e949d;">Doc</span>`), y asignado el color primario de marca `#2e3e56` a todos los botones y `#3e689a` a enlaces.
+- **Corrección de Mismatch de Hidratación:**
+  - El formateo de fechas localizadas (`es-CL`) a través de `.toLocaleDateString()` provocaba fallos de hidratación por el uso de caracteres de espacio estrechos no divisibles en el servidor frente a normales en cliente, y diferencias de zona horaria.
+  - Normalizados los caracteres de espacio en `formatDate` en [[global-timeline.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/layout/global-timeline.tsx)].
+  - Añadido `suppressHydrationWarning` en las etiquetas `<span>` contenedoras de fechas dinámicas en:
+    - [[global-timeline.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/layout/global-timeline.tsx)]
+    - [[transmittal-table.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/transmittals/transmittal-table.tsx)]
+    - [[document-drawer.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/document-drawer.tsx)]
+    - [[document-columns.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/document-columns.tsx)]
+    - [[revision-timeline.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/revision-timeline.tsx)]
+
+### 2. Cambios en Base de Datos
+- **Estado:** Sin modificaciones de esquema SQL en esta sesión.
+
+### 3. Plan de Control e Integridad
+- Actualizado [[guidelines.md](file:///home/diegogto/Documents/Projects/Faberdoc/.agents/rules/guidelines.md)] documentando el sistema de diseño basado en la paleta de colores del logo.
+- Compilación del proyecto local verificada con éxito (`npm run build` finalizado exitosamente y con 0 errores).

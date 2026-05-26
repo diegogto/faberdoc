@@ -55,7 +55,9 @@
 - [x] BUG: Cuando el administrador acepta una solicitud de acceso, la acción no tiene efecto (el usuario aceptado no se incorpora ni aparece en la lista de miembros de la organización).
 
 ## IX. Plantillas de Correo e Imagen de Marca
-- [ ] Diseñar formatos HTML atractivos y profesionales para los correos (registro de usuario, invitaciones de equipo, recuperación de contraseña, etc.)
+- [x] Diseñar formatos HTML atractivos y profesionales para los correos (registro de usuario, invitaciones de equipo, recuperación de contraseña, etc.)
+- [x] Integrar el logotipo corporativo FaberDoc en formato SVG y su paleta de colores oficial (Faber Navy, Doc Medium Blue, Soft Steel Blue) en todas las vistas del sistema (sidebar, login, registro, onboarding y correos).
+- [x] Resolver el bug de hidratación (Hydration Mismatch) en fechas localizadas.
 
 ## X. Backlog (Futuras Mejoras & Características Premium)
 - [x] Línea de tiempo (Timeline) global: Vista general en pantalla principal para el historial de actividad y trazabilidad de documentos (en lugar del drawer)
