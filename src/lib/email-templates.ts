@@ -26,7 +26,7 @@ function getBaseEmailLayout({ title, previewText, contentHtml, logoUrl }: BaseEm
             <img src="${logoUrl}" alt="Logo" style="height: 36px; max-height: 36px; max-width: 180px; object-fit: contain; display: block;" />
           </td>
           <td align="right" valign="middle" style="font-size: 11px; color: #94a3b8; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-            vía Faberdoc
+            vía <span style="color: #2e3e56; font-weight: 600;">Faber</span><span style="color: #8e949d; font-weight: 600;">Doc</span>
           </td>
         </tr>
       </table>
@@ -35,8 +35,8 @@ function getBaseEmailLayout({ title, previewText, contentHtml, logoUrl }: BaseEm
       <table border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
           <td>
-            <span style="font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.025em; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-              Faberdoc
+            <span style="font-size: 20px; font-weight: 700; letter-spacing: -0.025em; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+              <span style="color: #2e3e56;">Faber</span><span style="color: #8e949d;">Doc</span>
             </span>
           </td>
         </tr>
@@ -71,7 +71,7 @@ function getBaseEmailLayout({ title, previewText, contentHtml, logoUrl }: BaseEm
           text-decoration: none;
         }
         a {
-          color: #2563eb;
+          color: #3e689a;
           text-decoration: none;
         }
         a:hover {
@@ -126,7 +126,7 @@ function getBaseEmailLayout({ title, previewText, contentHtml, logoUrl }: BaseEm
  */
 export function getRecoveryEmailHtml(email: string, actionLink: string, otpCode: string): string {
   const contentHtml = `
-    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">
+    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #2e3e56; letter-spacing: -0.01em;">
       Restablecer tu contraseña
     </h2>
     <p style="margin: 0 0 16px 0; color: #475569;">Hola,</p>
@@ -139,7 +139,7 @@ export function getRecoveryEmailHtml(email: string, actionLink: string, otpCode:
       <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; font-weight: 700; display: block; margin-bottom: 8px;">
         Código de Verificación Temporal
       </span>
-      <div style="font-family: monospace; font-size: 30px; font-weight: 800; letter-spacing: 6px; color: #0f172a; padding: 10px 20px; display: inline-block; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+      <div style="font-family: monospace; font-size: 30px; font-weight: 800; letter-spacing: 6px; color: #2e3e56; padding: 10px 20px; display: inline-block; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
         ${otpCode}
       </div>
       <p style="margin: 12px 0 0 0; font-size: 11px; color: #64748b;">
@@ -149,7 +149,7 @@ export function getRecoveryEmailHtml(email: string, actionLink: string, otpCode:
 
     <!-- Botón de Acción -->
     <div style="margin: 28px 0; text-align: center;">
-      <a href="${actionLink}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+      <a href="${actionLink}" style="display: inline-block; background-color: #2e3e56; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
         Restablecer Contraseña
       </a>
     </div>
@@ -159,7 +159,7 @@ export function getRecoveryEmailHtml(email: string, actionLink: string, otpCode:
     </p>
     <p style="margin: 16px 0 0 0; font-size: 11px; color: #94a3b8; word-break: break-all;">
       Enlace directo:<br />
-      <a href="${actionLink}" style="color: #4f46e5; text-decoration: underline;">${actionLink}</a>
+      <a href="${actionLink}" style="color: #3e689a; text-decoration: underline;">${actionLink}</a>
     </p>
   `;
 
@@ -175,7 +175,7 @@ export function getRecoveryEmailHtml(email: string, actionLink: string, otpCode:
  */
 export function getInviteEmailHtml(orgName: string, roleLabel: string, registerLink: string, logoUrl?: string | null): string {
   const contentHtml = `
-    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">
+    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #2e3e56; letter-spacing: -0.01em;">
       Invitación de Colaboración
     </h2>
     <p style="margin: 0 0 16px 0; color: #475569;">Hola,</p>
@@ -185,7 +185,7 @@ export function getInviteEmailHtml(orgName: string, roleLabel: string, registerL
     
     <!-- Botón de Acción -->
     <div style="margin: 28px 0; text-align: center;">
-      <a href="${registerLink}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+      <a href="${registerLink}" style="display: inline-block; background-color: #2e3e56; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
         Aceptar Invitación
       </a>
     </div>
@@ -195,7 +195,7 @@ export function getInviteEmailHtml(orgName: string, roleLabel: string, registerL
     </p>
     <p style="margin: 16px 0 0 0; font-size: 11px; color: #94a3b8; word-break: break-all;">
       Enlace directo:<br />
-      <a href="${registerLink}" style="color: #4f46e5; text-decoration: underline;">${registerLink}</a>
+      <a href="${registerLink}" style="color: #3e689a; text-decoration: underline;">${registerLink}</a>
     </p>
   `;
 
@@ -217,7 +217,7 @@ export function getWelcomeEmailHtml(fullName: string, verificationLink: string, 
         <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; font-weight: 700; display: block; margin-bottom: 8px;">
           Código de Verificación Temporal
         </span>
-        <div style="font-family: monospace; font-size: 30px; font-weight: 800; letter-spacing: 6px; color: #0f172a; padding: 10px 20px; display: inline-block; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+        <div style="font-family: monospace; font-size: 30px; font-weight: 800; letter-spacing: 6px; color: #2e3e56; padding: 10px 20px; display: inline-block; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
           ${otpCode}
         </div>
       </div>
@@ -225,7 +225,7 @@ export function getWelcomeEmailHtml(fullName: string, verificationLink: string, 
     : "";
 
   const contentHtml = `
-    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">
+    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #2e3e56; letter-spacing: -0.01em;">
       ¡Te damos la bienvenida a Faberdoc!
     </h2>
     <p style="margin: 0 0 16px 0; color: #475569;">Hola, ${fullName}:</p>
@@ -237,7 +237,7 @@ export function getWelcomeEmailHtml(fullName: string, verificationLink: string, 
 
     <!-- Botón de Acción -->
     <div style="margin: 28px 0; text-align: center;">
-      <a href="${verificationLink}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+      <a href="${verificationLink}" style="display: inline-block; background-color: #2e3e56; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
         Confirmar Cuenta
       </a>
     </div>
@@ -247,7 +247,7 @@ export function getWelcomeEmailHtml(fullName: string, verificationLink: string, 
     </p>
     <p style="margin: 16px 0 0 0; font-size: 11px; color: #94a3b8; word-break: break-all;">
       Enlace directo:<br />
-      <a href="${verificationLink}" style="color: #4f46e5; text-decoration: underline;">${verificationLink}</a>
+      <a href="${verificationLink}" style="color: #3e689a; text-decoration: underline;">${verificationLink}</a>
     </p>
   `;
 
@@ -274,7 +274,7 @@ export function getTransmittalEmailHtml(
     .map(
       (doc) => `
       <tr style="border-bottom: 1px solid #f1f5f9; color: #334155;">
-        <td style="padding: 10px; font-family: monospace; font-size: 12px; font-weight: 600; color: #0f172a;">
+        <td style="padding: 10px; font-family: monospace; font-size: 12px; font-weight: 600; color: #2e3e56;">
           ${doc.code}
         </td>
         <td style="padding: 10px; font-size: 13px;">
@@ -291,7 +291,7 @@ export function getTransmittalEmailHtml(
     .join("");
 
   const contentHtml = `
-    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">
+    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #2e3e56; letter-spacing: -0.01em;">
       Transmittal Emitido: ${transmittalCode}
     </h2>
     <p style="margin: 0 0 16px 0; color: #475569;">Hola,</p>
@@ -300,7 +300,7 @@ export function getTransmittalEmailHtml(
     </p>
 
     <!-- Resumen de Documentos -->
-    <h3 style="font-size: 14px; font-weight: 700; color: #0f172a; margin: 24px 0 10px 0; text-transform: uppercase; letter-spacing: 0.05em;">
+    <h3 style="font-size: 14px; font-weight: 700; color: #2e3e56; margin: 24px 0 10px 0; text-transform: uppercase; letter-spacing: 0.05em;">
       Documentos Incluidos
     </h3>
     <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 24px;">
@@ -320,14 +320,14 @@ export function getTransmittalEmailHtml(
 
     <!-- Botón de Acción -->
     <div style="margin: 28px 0; text-align: center;">
-      <a href="${transmittalLink}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+      <a href="${transmittalLink}" style="display: inline-block; background-color: #2e3e56; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
         Ver Transmittal y Descargar Archivos
       </a>
     </div>
 
     <p style="margin: 24px 0 0 0; font-size: 12px; color: #94a3b8; word-break: break-all;">
       Enlace directo:<br />
-      <a href="${transmittalLink}" style="color: #4f46e5; text-decoration: underline;">${transmittalLink}</a>
+      <a href="${transmittalLink}" style="color: #3e689a; text-decoration: underline;">${transmittalLink}</a>
     </p>
   `;
 
@@ -350,7 +350,7 @@ export function getProjectInviteEmailHtml(
   logoUrl?: string | null
 ): string {
   const contentHtml = `
-    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">
+    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #2e3e56; letter-spacing: -0.01em;">
       Asignación de Proyecto
     </h2>
     <p style="margin: 0 0 16px 0; color: #475569;">Hola, ${userName}:</p>
@@ -360,14 +360,14 @@ export function getProjectInviteEmailHtml(
 
     <!-- Botón de Acción -->
     <div style="margin: 28px 0; text-align: center;">
-      <a href="${projectLink}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+      <a href="${projectLink}" style="display: inline-block; background-color: #2e3e56; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
         Ir al Proyecto
       </a>
     </div>
 
     <p style="margin: 24px 0 0 0; font-size: 12px; color: #94a3b8; word-break: break-all;">
       Enlace directo:<br />
-      <a href="${projectLink}" style="color: #4f46e5; text-decoration: underline;">${projectLink}</a>
+      <a href="${projectLink}" style="color: #3e689a; text-decoration: underline;">${projectLink}</a>
     </p>
   `;
 
@@ -391,7 +391,7 @@ export function getReviewPendingEmailHtml(
   logoUrl?: string | null
 ): string {
   const contentHtml = `
-    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">
+    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #2e3e56; letter-spacing: -0.01em;">
       Documento Pendiente de Revisión
     </h2>
     <p style="margin: 0 0 16px 0; color: #475569;">Hola,</p>
@@ -404,7 +404,7 @@ export function getReviewPendingEmailHtml(
       <table border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
           <td style="padding-bottom: 8px; font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; width: 100px;">Código:</td>
-          <td style="padding-bottom: 8px; font-size: 14px; font-weight: 700; color: #0f172a; font-family: monospace;">${documentCode}</td>
+          <td style="padding-bottom: 8px; font-size: 14px; font-weight: 700; color: #2e3e56; font-family: monospace;">${documentCode}</td>
         </tr>
         <tr>
           <td style="padding-bottom: 8px; font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Título:</td>
@@ -423,14 +423,14 @@ export function getReviewPendingEmailHtml(
 
     <!-- Botón de Acción -->
     <div style="margin: 28px 0; text-align: center;">
-      <a href="${reviewLink}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+      <a href="${reviewLink}" style="display: inline-block; background-color: #2e3e56; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
         Iniciar Revisión
       </a>
     </div>
 
     <p style="margin: 24px 0 0 0; font-size: 12px; color: #94a3b8; word-break: break-all;">
       Enlace directo:<br />
-      <a href="${reviewLink}" style="color: #4f46e5; text-decoration: underline;">${reviewLink}</a>
+      <a href="${reviewLink}" style="color: #3e689a; text-decoration: underline;">${reviewLink}</a>
     </p>
   `;
 
@@ -462,7 +462,7 @@ export function getDocumentCommentedEmailHtml(
   const levelText = commentLevel === 'MAJOR' ? 'MAYOR (Re-revisión completa)' : 'MENOR (Aprobación al resubir)';
 
   const contentHtml = `
-    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">
+    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #2e3e56; letter-spacing: -0.01em;">
       Documento Comentado
     </h2>
     <p style="margin: 0 0 16px 0; color: #475569;">Hola, ${uploaderName}:</p>
@@ -475,7 +475,7 @@ export function getDocumentCommentedEmailHtml(
       <table border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
           <td style="padding-bottom: 8px; font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; width: 120px;">Código:</td>
-          <td style="padding-bottom: 8px; font-size: 14px; font-weight: 700; color: #0f172a; font-family: monospace;">${documentCode}</td>
+          <td style="padding-bottom: 8px; font-size: 14px; font-weight: 700; color: #2e3e56; font-family: monospace;">${documentCode}</td>
         </tr>
         <tr>
           <td style="padding-bottom: 8px; font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Título:</td>
@@ -499,21 +499,21 @@ export function getDocumentCommentedEmailHtml(
         </tr>
         <tr>
           <td style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Comentarios:</td>
-          <td style="font-size: 14px; font-weight: 700; color: #0f172a;">${commentsCount} comentario(s) registrado(s)</td>
+          <td style="font-size: 14px; font-weight: 700; color: #2e3e56;">${commentsCount} comentario(s) registrado(s)</td>
         </tr>
       </table>
     </div>
 
     <!-- Botón de Acción -->
     <div style="margin: 28px 0; text-align: center;">
-      <a href="${detailLink}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+      <a href="${detailLink}" style="display: inline-block; background-color: #2e3e56; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
         Ver Detalles e Responder
       </a>
     </div>
 
     <p style="margin: 24px 0 0 0; font-size: 12px; color: #94a3b8; word-break: break-all;">
       Enlace directo:<br />
-      <a href="${detailLink}" style="color: #4f46e5; text-decoration: underline;">${detailLink}</a>
+      <a href="${detailLink}" style="color: #3e689a; text-decoration: underline;">${detailLink}</a>
     </p>
   `;
 
@@ -537,7 +537,7 @@ export function getDocumentApprovedEmailHtml(
   logoUrl?: string | null
 ): string {
   const contentHtml = `
-    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">
+    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #2e3e56; letter-spacing: -0.01em;">
       Documento Aprobado Internamente
     </h2>
     <p style="margin: 0 0 16px 0; color: #475569;">Hola,</p>
@@ -550,7 +550,7 @@ export function getDocumentApprovedEmailHtml(
       <table border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
           <td style="padding-bottom: 8px; font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; width: 100px;">Código:</td>
-          <td style="padding-bottom: 8px; font-size: 14px; font-weight: 700; color: #0f172a; font-family: monospace;">${documentCode}</td>
+          <td style="padding-bottom: 8px; font-size: 14px; font-weight: 700; color: #2e3e56; font-family: monospace;">${documentCode}</td>
         </tr>
         <tr>
           <td style="padding-bottom: 8px; font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Título:</td>
@@ -569,14 +569,14 @@ export function getDocumentApprovedEmailHtml(
 
     <!-- Botón de Acción -->
     <div style="margin: 28px 0; text-align: center;">
-      <a href="${detailLink}" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+      <a href="${detailLink}" style="display: inline-block; background-color: #2e3e56; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
         Ver Documento y Emitir
       </a>
     </div>
 
     <p style="margin: 24px 0 0 0; font-size: 12px; color: #94a3b8; word-break: break-all;">
       Enlace directo:<br />
-      <a href="${detailLink}" style="color: #4f46e5; text-decoration: underline;">${detailLink}</a>
+      <a href="${detailLink}" style="color: #3e689a; text-decoration: underline;">${detailLink}</a>
     </p>
   `;
 

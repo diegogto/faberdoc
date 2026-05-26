@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { FolderKanban, LogOut, AlertTriangle, ChevronRight, Check, Loader2, Hourglass } from "lucide-react";
+import { LogOut, AlertTriangle, ChevronRight, Check, Loader2, Hourglass } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 import {
   completeOnboardingAction,
   joinExistingOrgAction,
@@ -109,13 +110,8 @@ export function OnboardingClient({
         
         {/* Brand Header */}
         <div className="flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
-            <FolderKanban className="h-6 w-6" />
-          </div>
+          <Logo className="h-20 w-auto" />
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Faberdoc
-            </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Configuración del Espacio
             </p>

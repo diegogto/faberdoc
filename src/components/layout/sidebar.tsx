@@ -6,11 +6,11 @@ import { usePathname } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
-  FolderKanban,
   Building2,
   ExternalLink,
   Plus,
 } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -57,17 +57,10 @@ export function Sidebar({ projects, organizationName, user }: SidebarProps) {
         <div
           className={cn(
             "flex items-center h-[var(--topbar-height)] border-b border-border px-3",
-            isCollapsed ? "justify-center" : "gap-2"
+            isCollapsed ? "justify-center" : "px-4"
           )}
         >
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <FolderKanban className="h-4 w-4" />
-          </div>
-          {!isCollapsed && (
-            <span className="text-sm font-semibold tracking-tight truncate">
-              Faberdoc
-            </span>
-          )}
+          <Logo iconOnly={isCollapsed} className={cn("h-9 w-auto transition-all duration-300", isCollapsed ? "h-[33px]" : "")} />
         </div>
 
         {/* Projects List */}

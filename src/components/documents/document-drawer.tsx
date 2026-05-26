@@ -266,7 +266,7 @@ export function DocumentDrawer({
                             <Calendar className="h-3.5 w-3.5" />
                             Fecha Planificada
                           </span>
-                          <span className="text-zinc-900 dark:text-zinc-100">
+                          <span className="text-zinc-900 dark:text-zinc-100" suppressHydrationWarning>
                             {formatDate(
                               documentDetail.issuance.current_planned_date
                             )}
@@ -277,7 +277,7 @@ export function DocumentDrawer({
                             <Calendar className="h-3.5 w-3.5" />
                             Fecha Emisión Real
                           </span>
-                          <span className="text-zinc-900 dark:text-zinc-100">
+                          <span className="text-zinc-900 dark:text-zinc-100" suppressHydrationWarning>
                             {formatDate(
                               documentDetail.issuance.actual_issuance_date
                             )}

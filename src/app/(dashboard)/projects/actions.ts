@@ -274,3 +274,154 @@ export async function assignProjectMemberAction(
   }
 }
 
+/**
+ * Removes a user from a project's member list.
+ * Only project ADMINs or org admins can remove members.
+ * A user cannot remove themselves.
+ */
+export async function removeProjectMemberAction(projectId: string, targetUserId: string) {
+  const supabase = await createClient();
+
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No estás autenticado." };
+
+  if (authUser.id === targetUserId) {
+    return { error: "No puedes removerte a ti mismo del proyecto." };
+  }
+
+  try {
+    // Verify caller is org admin or project ADMIN
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("organization_id, is_admin")
+      .eq("id", authUser.id)
+      .single();
+
+    if (!userProfile) return { error: "No se encontró perfil de usuario." };
+
+    const { data: callerMember } = await supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", authUser.id)
+      .single();
+
+    if (!userProfile.is_admin && callerMember?.role !== "ADMIN") {
+      return { error: "No tienes permisos para remover miembros de este proyecto." };
+    }
+
+    const { error: deleteError } = await supabase
+      .from("project_members")
+      .delete()
+      .eq("project_id", projectId)
+      .eq("user_id", targetUserId);
+
+    if (deleteError) {
+      return { error: `Error al remover miembro: ${deleteError.message}` };
+    }
+
+    revalidatePath(`/projects/${projectId}/settings`);
+    return { success: true };
+  } catch (err) {
+    console.error("Excepción al remover miembro del proyecto:", err);
+    return { error: "Ocurrió un error inesperado al remover el miembro." };
+  }
+}
+
+/**
+ * Persists the visual review flow diagram (nodes + edges) to the project's
+ * review_flow_config JSONB column.
+ */
+export async function saveReviewFlowAction(
+  projectId: string,
+  flowConfig: { nodes: unknown[]; edges: unknown[] }
+) {
+  const supabase = await createClient();
+
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No estás autenticado." };
+
+  try {
+    // Verify caller is org admin or project ADMIN
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin")
+      .eq("id", authUser.id)
+      .single();
+
+    const { data: callerMember } = await supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", authUser.id)
+      .single();
+
+    const isProjectAdmin = callerMember?.role === "ADMIN" || callerMember?.role === "COORDINATOR";
+    if (!userProfile?.is_admin && !isProjectAdmin) {
+      return { error: "Solo los administradores del proyecto pueden modificar el flujo de aprobación." };
+    }
+
+    const { error } = await supabase
+      .from("projects")
+      .update({ review_flow_config: flowConfig } as any)
+      .eq("id", projectId);
+
+    if (error) return { error: `Error al guardar el flujo: ${error.message}` };
+
+    revalidatePath(`/projects/${projectId}/settings`);
+    return { success: true };
+  } catch (err) {
+    console.error("Excepción al guardar flujo de revisión:", err);
+    return { error: "Ocurrió un error inesperado al guardar el flujo." };
+  }
+}
+
+/**
+ * Saves the entire list of approval flows for the project.
+ */
+export async function saveProjectFlowsAction(
+  projectId: string,
+  flows: any[]
+) {
+  const supabase = await createClient();
+
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No estás autenticado." };
+
+  try {
+    // Verify caller is org admin or project ADMIN
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin")
+      .eq("id", authUser.id)
+      .single();
+
+    const { data: callerMember } = await supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", authUser.id)
+      .single();
+
+    const isProjectAdmin = callerMember?.role === "ADMIN" || callerMember?.role === "COORDINATOR";
+    if (!userProfile?.is_admin && !isProjectAdmin) {
+      return { error: "Solo los administradores del proyecto pueden modificar el flujo de aprobación." };
+    }
+
+    const { error } = await supabase
+      .from("projects")
+      .update({ review_flow_config: { flows } } as any)
+      .eq("id", projectId);
+
+    if (error) return { error: `Error al guardar los flujos: ${error.message}` };
+
+    revalidatePath(`/projects/${projectId}/settings`);
+    return { success: true };
+  } catch (err) {
+    console.error("Excepción al guardar flujos del proyecto:", err);
+    return { error: "Ocurrió un error inesperado al guardar los flujos." };
+  }
+}
+
+
+

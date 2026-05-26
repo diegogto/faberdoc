@@ -130,7 +130,7 @@ export function RevisionTimeline({ revisions, projectId, onRefresh }: RevisionTi
                   {revision.uploader_name}
                 </span>
                 <span>•</span>
-                <span>{formatDate(revision.created_at)}</span>
+                <span suppressHydrationWarning>{formatDate(revision.created_at)}</span>
               </div>
 
               {/* Files */}
@@ -171,7 +171,7 @@ export function RevisionTimeline({ revisions, projectId, onRefresh }: RevisionTi
                       className="rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 p-3 space-y-2"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-zinc-400">
+                        <span className="text-xs text-zinc-400" suppressHydrationWarning>
                           {formatDate(comment.created_at)}
                         </span>
                         <StatusBadge status={comment.status} />

@@ -100,7 +100,7 @@ const transmittalColumns: ColumnDef<TransmittalTableRow>[] = [
     cell: ({ row }) => {
       const date = row.getValue("created_at") as string;
       return (
-        <span className="text-sm text-muted-foreground">
+        <span className="text-sm text-muted-foreground" suppressHydrationWarning>
           {new Date(date).toLocaleDateString("es-CL", {
             day: "2-digit",
             month: "short",

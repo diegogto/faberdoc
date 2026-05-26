@@ -50,71 +50,71 @@
 
 :root {
   --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --foreground: oklch(0.32 0.045 250); /* Brand Navy #2e3e56 */
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.32 0.045 250);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.32 0.045 250);
+  --primary: oklch(0.32 0.045 250); /* Brand Navy #2e3e56 */
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.95 0.015 250); /* Soft grayish blue #f1f3f7 */
+  --secondary-foreground: oklch(0.32 0.045 250);
+  --muted: oklch(0.95 0.015 250);
+  --muted-foreground: oklch(0.64 0.01 250); /* Brand Gray #8e949d */
+  --accent: oklch(0.92 0.025 250); /* Slightly darker grayish blue #e9ecf2 */
+  --accent-foreground: oklch(0.32 0.045 250);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --border: oklch(0.90 0.015 250); /* Border light blue-gray #dee2e8 */
+  --input: oklch(0.90 0.015 250);
+  --ring: oklch(0.48 0.10 250); /* Brand Medium Blue #3e689a */
+  --chart-1: oklch(0.48 0.10 250); /* Brand Medium Blue */
+  --chart-2: oklch(0.64 0.01 250); /* Brand Gray */
+  --chart-3: oklch(0.74 0.05 250); /* Brand Light Blue */
+  --chart-4: oklch(0.32 0.045 250); /* Brand Navy */
+  --chart-5: oklch(0.20 0.015 250);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar: oklch(0.975 0.01 250); /* Soft sidebar bg */
+  --sidebar-foreground: oklch(0.32 0.045 250);
+  --sidebar-primary: oklch(0.32 0.045 250);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-accent: oklch(0.93 0.02 250);
+  --sidebar-accent-foreground: oklch(0.32 0.045 250);
+  --sidebar-border: oklch(0.90 0.015 250);
+  --sidebar-ring: oklch(0.48 0.10 250);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.18 0.015 250); /* Dark navy-gray bg #19202c */
+  --foreground: oklch(0.95 0.01 250); /* Light text */
+  --card: oklch(0.22 0.02 250); /* Dark card bg #222b3b */
+  --card-foreground: oklch(0.95 0.01 250);
+  --popover: oklch(0.22 0.02 250);
+  --popover-foreground: oklch(0.95 0.01 250);
+  --primary: oklch(0.74 0.05 250); /* Brand Light Blue #a0b3cf */
+  --primary-foreground: oklch(0.12 0.02 250);
+  --secondary: oklch(0.25 0.02 250); /* Dark grayish blue accent #2a3547 */
+  --secondary-foreground: oklch(0.95 0.01 250);
+  --muted: oklch(0.25 0.02 250);
+  --muted-foreground: oklch(0.65 0.02 250); /* Brand Gray/Steel */
+  --accent: oklch(0.28 0.025 250);
+  --accent-foreground: oklch(0.98 0.01 250);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --border: oklch(0.25 0.02 250 / 60%);
+  --input: oklch(0.25 0.02 250 / 60%);
+  --ring: oklch(0.48 0.10 250);
+  --chart-1: oklch(0.74 0.05 250);
+  --chart-2: oklch(0.48 0.10 250);
+  --chart-3: oklch(0.65 0.02 250);
+  --chart-4: oklch(0.95 0.01 250);
+  --chart-5: oklch(0.28 0.025 250);
+  --sidebar: oklch(0.20 0.015 250); /* Sidebar dark blue-gray */
+  --sidebar-foreground: oklch(0.90 0.01 250);
+  --sidebar-primary: oklch(0.48 0.10 250);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-accent: oklch(0.25 0.02 250);
+  --sidebar-accent-foreground: oklch(0.95 0.01 250);
+  --sidebar-border: oklch(0.25 0.02 250 / 60%);
+  --sidebar-ring: oklch(0.48 0.10 250);
 }
 
 /* ─── Faberdoc Design Tokens ──────────────────────────────────────────── */
@@ -134,8 +134,8 @@
   --spacing-2xl: 3rem;
 
   /* Status colors (semantic) */
-  --status-draft: oklch(0.637 0 0);
-  --status-draft-bg: oklch(0.637 0 0 / 12%);
+  --status-draft: oklch(0.637 0.01 250);
+  --status-draft-bg: oklch(0.637 0.01 250 / 12%);
   --status-review: oklch(0.75 0.18 55);
   --status-review-bg: oklch(0.75 0.18 55 / 12%);
   --status-approved: oklch(0.65 0.2 155);
@@ -166,10 +166,10 @@
     @apply transition-colors duration-150;
   }
   .notion-table-row:hover {
-    background-color: oklch(0.97 0 0);
+    background-color: oklch(0.97 0.005 250);
   }
   .dark .notion-table-row:hover {
-    background-color: oklch(0.22 0 0);
+    background-color: oklch(0.22 0.01 250);
   }
 
   /* Sidebar transitions */
@@ -190,13 +190,13 @@
     background: transparent;
   }
   .notion-scroll::-webkit-scrollbar-thumb {
-    background-color: oklch(0.8 0 0);
+    background-color: oklch(0.8 0.01 250);
     border-radius: 3px;
   }
   .notion-scroll::-webkit-scrollbar-thumb:hover {
-    background-color: oklch(0.7 0 0);
+    background-color: oklch(0.7 0.01 250);
   }
   .dark .notion-scroll::-webkit-scrollbar-thumb {
-    background-color: oklch(0.35 0 0);
+    background-color: oklch(0.35 0.01 250);
   }
 }

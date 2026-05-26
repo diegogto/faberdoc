@@ -88,7 +88,12 @@ Faberdoc es un sistema de Document Control para ingeniería. La interfaz debe im
 ## 4. FILOSOFIA DE INTERFAZ (UX/UI)
 - **Navegacion:** Uso extensivo de 'Sheets' (Drawers) laterales para no perder contexto de la tabla principal (MDL).
 - **Feedback:** 'Optimistic Updates' mediante TanStack Query para acciones de estado.
-- **Estética:** Minimalista, paleta neutra, acentos de color solo en Badges de estado.
+- **Estética:** Minimalista e inspirada en la paleta de colores oficial de FaberDoc:
+  - **Faber Navy (`#2e3e56` / `oklch(0.32 0.045 250)`):** Color primario para texto, botones principales y estructura.
+  - **Doc Medium Blue (`#3e689a` / `oklch(0.48 0.10 250)`):** Color de acento, bordes e indicadores de enfoque.
+  - **Soft Steel Blue (`#a0b3cf` / `oklch(0.74 0.05 250)`):** Fondos secundarios, ilustraciones y badges.
+  - **Neutral Gray (`#8e949d` / `oklch(0.64 0.01 250)`):** Color de texto secundario y bordes.
+  - **Dark Mode Background (`#19202c` / `oklch(0.18 0.015 250)`):** Fondo premium del dashboard en modo oscuro.
 
 ## 5. REGLAS DE NEGOCIO CRITICAS
 - **Naming Engine:** Función pura que genera el `document_code` basado en el patrón del proyecto y las `custom_properties`.

@@ -123,7 +123,7 @@ export function generateDocumentColumns(
         const date = row.getValue("planned_date") as string | null;
         if (!date) return <span className="text-sm text-muted-foreground/60">—</span>;
         return (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground" suppressHydrationWarning>
             {new Date(date).toLocaleDateString("es-CL", {
               day: "2-digit",
               month: "short",
@@ -150,7 +150,7 @@ export function generateDocumentColumns(
         const date = row.getValue("actual_date") as string | null;
         if (!date) return <span className="text-sm text-muted-foreground/60">—</span>;
         return (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground" suppressHydrationWarning>
             {new Date(date).toLocaleDateString("es-CL", {
               day: "2-digit",
               month: "short",

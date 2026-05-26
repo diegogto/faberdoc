@@ -16,7 +16,7 @@ function formatDate(dateString: string): string {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
-  });
+  }).replace(/[\u00A0\u202F]/g, " ");
 }
 
 export function GlobalTimeline({ activities }: GlobalTimelineProps) {
@@ -121,7 +121,7 @@ export function GlobalTimeline({ activities }: GlobalTimelineProps) {
                 )}
 
                 {/* Date */}
-                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 tracking-wide font-mono mt-0.5">
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 tracking-wide font-mono mt-0.5" suppressHydrationWarning>
                   {formatDate(activity.created_at)}
                 </span>
               </div>

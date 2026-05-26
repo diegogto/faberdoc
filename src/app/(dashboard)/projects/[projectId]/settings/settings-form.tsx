@@ -419,22 +419,7 @@ export function SettingsForm({ project }: SettingsFormProps) {
           </select>
         </div>
 
-        {/* Review Flow Type Selection */}
-        <div className="flex flex-col gap-2">
-          <label htmlFor="review-flow-type-select" className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-            Flujo de Revisión Interna
-          </label>
-          <select
-            id="review-flow-type-select"
-            value={reviewFlowType}
-            onChange={(e) => setReviewFlowType(e.target.value)}
-            disabled={isPending}
-            className="flex h-9 max-w-md w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 cursor-pointer"
-          >
-            <option value="PARALLEL" className="text-zinc-900">Paralela (Simultánea)</option>
-            <option value="SEQUENTIAL" className="text-zinc-900">Subsecuente / Secuencial</option>
-          </select>
-        </div>
+
       </div>
 
       <Button type="submit" disabled={isPending} className="mt-4 cursor-pointer">
