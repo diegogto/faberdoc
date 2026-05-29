@@ -127,7 +127,10 @@ export async function requestResetPasswordAction(formData: FormData) {
     });
 
     if (error || !data?.properties?.hashed_token || !data?.properties?.email_otp) {
-      console.error("Supabase Admin Generate Recovery Link Error:", error);
+      console.error("\n❌ ERROR AL GENERAR ENLACE DE RECUPERACIÓN (Supabase):");
+      console.error(`👉 Email:       ${email}`);
+      console.error(`👉 Error:       `, error);
+      console.error("========================================================\n");
       redirectToPath = "/forgot-password?error=request-failed";
     } else {
       const hashedToken = data.properties.hashed_token;
@@ -146,14 +149,19 @@ export async function requestResetPasswordAction(formData: FormData) {
       });
 
       if (!emailResult.success) {
-        console.error("Error sending custom recovery email via Resend:", emailResult.error);
+        console.error("\n❌ ERROR EN EL ENVÍO DE EMAIL DE RECUPERACIÓN:");
+        console.error(`👉 Para:        ${email}`);
+        console.error(`👉 Detalle:     `, emailResult.error);
+        console.error("========================================================\n");
         redirectToPath = "/forgot-password?error=request-failed";
       } else {
         redirectToPath = `/forgot-password/verify?email=${encodeURIComponent(email)}`;
       }
     }
   } catch (err) {
-    console.error("Unexpected error in requestResetPasswordAction:", err);
+    console.error("\n❌ ERROR INESPERADO AL SOLICITAR RECUPERACIÓN:");
+    console.error(`👉 Error:       `, err);
+    console.error("========================================================\n");
     redirectToPath = "/forgot-password?error=request-failed";
   }
 

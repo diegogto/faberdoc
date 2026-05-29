@@ -29,7 +29,7 @@
 - [x] Habilitar la modificación del ancho del sidebar (panel lateral/Sheet) del documento
 
 ## V. Control de Revisiones y Almacenamiento
-- [ ] Carga de archivos a Supabase Storage con subida directa y segura
+- [x] Carga de archivos a Supabase Storage con subida directa y segura
 - [x] Generación de URLs firmadas (Presigned URLs) con expiración corta para descarga
 - [x] Lógica de versionamiento dinámico (`version_index` y `version_label`)
 

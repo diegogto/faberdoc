@@ -18,6 +18,8 @@ import {
   uploadRevisionFileAction,
   updateRevisionStatusAction,
   addCommentToRevisionAction,
+  getSignedUploadUrlAction,
+  registerUploadedFileAction,
 } from "@/app/(dashboard)/projects/[projectId]/mdl/revision-actions";
 import {
   Upload,
@@ -138,21 +140,55 @@ export function DocumentDrawer({
     if (!file || !latestRevision || !documentDetail) return;
     setErrorMsg(null);
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     startTransition(async () => {
-      const res = await uploadRevisionFileAction(
-        projectId,
-        documentDetail.document.id,
-        latestRevision.id,
-        formData
-      );
-      if (res.error) {
-        setErrorMsg(res.error);
-      } else {
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        onRefresh?.();
+      try {
+        // 1. Obtener la URL firmada de subida y el s3Key único
+        const signedRes = await getSignedUploadUrlAction(
+          projectId,
+          documentDetail.document.id,
+          latestRevision.id,
+          file.name,
+          file.type
+        );
+
+        if (signedRes.error || !signedRes.signedUrl || !signedRes.s3Key) {
+          setErrorMsg(signedRes.error || "No se pudo obtener la URL de subida firmada.");
+          return;
+        }
+
+        // 2. Subir directamente el archivo usando fetch a la URL firmada
+        const uploadResponse = await fetch(signedRes.signedUrl, {
+          method: "PUT",
+          headers: {
+            "Content-Type": file.type,
+          },
+          body: file,
+        });
+
+        if (!uploadResponse.ok) {
+          setErrorMsg("Error al subir el archivo a almacenamiento.");
+          return;
+        }
+
+        // 3. Registrar el archivo en la base de datos
+        const registerRes = await registerUploadedFileAction(
+          projectId,
+          documentDetail.document.id,
+          latestRevision.id,
+          signedRes.s3Key,
+          file.name,
+          file.size
+        );
+
+        if (registerRes.error) {
+          setErrorMsg(registerRes.error);
+        } else {
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          onRefresh?.();
+        }
+      } catch (err) {
+        console.error("Error durante el flujo de subida directa:", err);
+        setErrorMsg("Ocurrió un error inesperado al subir el archivo.");
       }
     });
   };

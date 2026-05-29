@@ -589,3 +589,117 @@ export async function getDownloadUrlAction(projectId: string, s3Key: string) {
   }
 }
 
+/**
+ * Genera una URL firmada de subida para cargar directamente desde el cliente.
+ */
+export async function getSignedUploadUrlAction(
+  projectId: string,
+  documentId: string,
+  revisionId: string,
+  fileName: string,
+  fileType: string
+) {
+  const access = await verifyUserProjectAccess(projectId);
+  if (access.error || !access.user) {
+    return { error: access.error };
+  }
+
+  try {
+    const timestamp = Date.now();
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const uniqueName = `${timestamp}-${cleanFileName}`;
+    const s3Key = `projects/${projectId}/documents/${documentId}/${uniqueName}`;
+
+    const res = await storageService.createSignedUploadUrl(s3Key);
+    return {
+      success: true,
+      signedUrl: res.signedUrl,
+      token: res.token,
+      s3Key,
+    };
+  } catch (err) {
+    console.error("Error al generar URL firmada de subida:", err);
+    return { error: "No se pudo generar el enlace de subida seguro." };
+  }
+}
+
+/**
+ * Registra el archivo subido en la base de datos y actualiza el estado de la revisión.
+ */
+export async function registerUploadedFileAction(
+  projectId: string,
+  documentId: string,
+  revisionId: string,
+  s3Key: string,
+  fileName: string,
+  fileSize: number
+) {
+  const access = await verifyUserProjectAccess(projectId);
+  if (access.error || !access.user) {
+    return { error: access.error };
+  }
+
+  const adminSupabase = createAdminClient();
+
+  try {
+    // 1. Guardar registro del archivo en la base de datos
+    const { data: fileRecord, error: fileError } = await adminSupabase
+      .from("files")
+      .insert({
+        revision_id: revisionId,
+        s3_key: s3Key,
+        file_name: fileName,
+        file_size_bytes: fileSize,
+      })
+      .select()
+      .single();
+
+    if (fileError) {
+      // Eliminar el archivo de Supabase Storage si falla el registro en BD
+      await storageService.deleteFile(s3Key);
+      return { error: `Error al guardar archivo en la base de datos: ${fileError.message}` };
+    }
+
+    // 2. Calcular transiciones de estado de la revisión
+    const { data: revision, error: revError } = await adminSupabase
+      .from("revisions")
+      .select("status, comment_level")
+      .eq("id", revisionId)
+      .single();
+
+    if (revError || !revision) {
+      return { error: "No se pudo recuperar la revisión asociada." };
+    }
+
+    let nextStatus = revision.status;
+    if (revision.status === "COMMENTED") {
+      if (revision.comment_level === "MINOR") {
+        nextStatus = "APPROVED";
+      } else {
+        nextStatus = "IN_REVIEW";
+      }
+    } else if (revision.status === "DRAFT") {
+      nextStatus = "IN_REVIEW";
+    }
+
+    if (nextStatus !== revision.status) {
+      const { error: updateError } = await adminSupabase
+        .from("revisions")
+        .update({ status: nextStatus })
+        .eq("id", revisionId);
+
+      if (updateError) {
+        console.error("Error al actualizar estado de la revisión:", updateError);
+      } else {
+        await sendRevisionStatusNotifications(projectId, revisionId);
+      }
+    }
+
+    revalidatePath(`/projects/${projectId}/mdl`);
+    return { success: true, fileRecord };
+  } catch (err) {
+    console.error("Excepción al registrar archivo de revisión:", err);
+    return { error: "Ocurrió un error inesperado al registrar el archivo." };
+  }
+}
+

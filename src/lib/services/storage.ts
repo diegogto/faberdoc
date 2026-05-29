@@ -12,6 +12,10 @@ export interface StorageService {
   getSignedUrl(s3Key: string): Promise<string>;
   
   deleteFile(s3Key: string): Promise<void>;
+
+  createSignedUploadUrl(
+    s3Key: string
+  ): Promise<{ signedUrl: string; token: string; path: string }>;
 }
 
 export class LocalStorageService implements StorageService {
@@ -85,6 +89,12 @@ export class LocalStorageService implements StorageService {
     } catch (e) {
       // Ignore
     }
+  }
+
+  async createSignedUploadUrl(
+    s3Key: string
+  ): Promise<{ signedUrl: string; token: string; path: string }> {
+    throw new Error("createSignedUploadUrl is not supported in LocalStorageService");
   }
 }
 
@@ -168,13 +178,126 @@ export class R2StorageService implements StorageService {
       })
     );
   }
+
+  async createSignedUploadUrl(
+    s3Key: string
+  ): Promise<{ signedUrl: string; token: string; path: string }> {
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: s3Key,
+    });
+    // Sign PUT upload for 15 minutes (900 seconds)
+    const signedUrl = await getSignedUrl(this.client, command, { expiresIn: 900 });
+    return { signedUrl, token: "", path: s3Key };
+  }
 }
+
+export class SupabaseStorageService implements StorageService {
+  private bucketName = "faberdoc-files";
+
+  async uploadFile(
+    file: File | { name: string; size: number; buffer: Buffer; mimeType: string },
+    folderPath: string
+  ): Promise<{ s3Key: string; fileUrl: string; sizeBytes: number }> {
+    const fileName = "name" in file ? file.name : (file as any).name;
+    const size = "size" in file ? file.size : (file as any).size;
+    const mimeType = "mimeType" in file ? file.mimeType : (file as any).mimeType || "application/octet-stream";
+
+    let buffer: Buffer;
+    if ("arrayBuffer" in file && typeof file.arrayBuffer === "function") {
+      const arrayBuffer = await file.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+    } else if ("buffer" in file) {
+      buffer = file.buffer;
+    } else {
+      throw new Error("Invalid file format");
+    }
+
+    const timestamp = Date.now();
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const uniqueName = `${timestamp}-${cleanFileName}`;
+    const s3Key = `${folderPath}/${uniqueName}`.replace(/\\/g, "/").replace(/\/+/g, "/");
+
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const adminClient = createAdminClient();
+    const { error } = await adminClient.storage
+      .from(this.bucketName)
+      .upload(s3Key, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+    if (error) {
+      throw new Error(`Failed to upload to Supabase: ${error.message}`);
+    }
+
+    const fileUrl = `/api/files/download?key=${encodeURIComponent(s3Key)}`;
+
+    return {
+      s3Key,
+      fileUrl,
+      sizeBytes: size,
+    };
+  }
+
+  async getSignedUrl(s3Key: string): Promise<string> {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const adminClient = createAdminClient();
+    const { data, error } = await adminClient.storage
+      .from(this.bucketName)
+      .createSignedUrl(s3Key, 900); // 15 mins
+
+    if (error || !data) {
+      throw new Error(`Failed to generate signed URL: ${error?.message || "Unknown error"}`);
+    }
+
+    return data.signedUrl;
+  }
+
+  async deleteFile(s3Key: string): Promise<void> {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const adminClient = createAdminClient();
+    const { error } = await adminClient.storage
+      .from(this.bucketName)
+      .remove([s3Key]);
+
+    if (error) {
+      console.error("Failed to delete file from Supabase Storage:", error);
+    }
+  }
+
+  async createSignedUploadUrl(
+    s3Key: string
+  ): Promise<{ signedUrl: string; token: string; path: string }> {
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const adminClient = createAdminClient();
+    const { data, error } = await adminClient.storage
+      .from(this.bucketName)
+      .createSignedUploadUrl(s3Key);
+
+    if (error || !data) {
+      throw new Error(`Failed to create signed upload URL: ${error?.message || "Unknown error"}`);
+    }
+
+    return {
+      signedUrl: data.signedUrl,
+      token: data.token,
+      path: data.path,
+    };
+  }
+}
+
+const isSupabaseConfigured =
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const isR2Configured =
   process.env.R2_ENDPOINT &&
   process.env.R2_ACCESS_KEY_ID &&
   process.env.R2_SECRET_ACCESS_KEY;
 
-export const storageService = isR2Configured
+export const storageService = isSupabaseConfigured
+  ? new SupabaseStorageService()
+  : isR2Configured
   ? new R2StorageService()
   : new LocalStorageService();
