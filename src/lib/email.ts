@@ -29,8 +29,8 @@ export async function sendEmail({
     }
   }
 
-  // Extraer código OTP (6 dígitos consecutivos)
-  const otpMatch = html.match(/\b\d{6}\b/);
+  // Extraer código OTP (6 dígitos consecutivos que no estén precedidos por '#' para evitar colores hex)
+  const otpMatch = html.match(/(?<!#)\b\d{6}\b/);
   const otpCode = otpMatch ? otpMatch[0] : null;
 
   // Si no está configurada la API key de Resend o estamos en desarrollo sin ella,
