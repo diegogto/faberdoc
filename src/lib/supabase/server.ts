@@ -39,6 +39,12 @@ export async function getRequestOrigin() {
   const cookieStore = await cookies(); // Asegura contexto de request
   const headersList = await import("next/headers").then(m => m.headers());
   
+  // En desarrollo (npm run dev), forzamos a usar el host solicitado localmente
+  if (process.env.NODE_ENV === "development") {
+    const host = headersList.get("host") || "localhost:3000";
+    return `http://${host}`;
+  }
+
   const forwardedHost = headersList.get("x-forwarded-host");
   const forwardedProto = headersList.get("x-forwarded-proto");
 
