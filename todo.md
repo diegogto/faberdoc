@@ -53,11 +53,16 @@
 - [x] Onboarding adaptativo con flujos de unirse por invitación, solicitar acceso o bypass de dominio
 - [x] BUG: Cuando un usuario solicita ser agregado a la organización, en la sección de solicitudes de acceso del panel del administrador sólo aparece "usuario" genérico sin detalles adicionales (como nombre o correo electrónico).
 - [x] BUG: Cuando el administrador acepta una solicitud de acceso, la acción no tiene efecto (el usuario aceptado no se incorpora ni aparece en la lista de miembros de la organización).
+- [x] BUG: Corrección de colisión de regex en el log del servidor (se capturaba el color CSS hexadecimal `#334155` como el código OTP).
+- [x] BUG: Corrección de redirección rota en el callback `/auth/confirm` en producción detrás de proxies inversos (redireccionaba a `https://0.0.0.0:3000`).
+- [x] MEJORA: Evitar reenvíos múltiples de recuperación (doble clic) en `/forgot-password` usando `useTransition` y un botón con estado de carga ("Enviando...").
+- [x] MEJORA: Mostrar explícitamente el correo al cual se le está restableciendo la clave en `/reset-password` y configurar los inputs para ser reconocidos automáticamente por gestores de contraseñas (`autoComplete="username"` y `autoComplete="new-password"`).
 
 ## IX. Plantillas de Correo e Imagen de Marca
 - [x] Diseñar formatos HTML atractivos y profesionales para los correos (registro de usuario, invitaciones de equipo, recuperación de contraseña, etc.)
 - [x] Integrar el logotipo corporativo FaberDoc en formato SVG y su paleta de colores oficial (Faber Navy, Doc Medium Blue, Soft Steel Blue) en todas las vistas del sistema (sidebar, login, registro, onboarding y correos).
 - [x] Resolver el bug de hidratación (Hydration Mismatch) en fechas localizadas.
+- [x] MEJORA: Integrar el logotipo corporativo FaberDoc SVG en las pantallas de recuperación de contraseña, confirmación de OTP y restablecimiento de contraseña.
 
 ## X. Backlog (Futuras Mejoras & Características Premium)
 - [x] Línea de tiempo (Timeline) global: Vista general en pantalla principal para el historial de actividad y trazabilidad de documentos (en lugar del drawer)

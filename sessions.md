@@ -223,3 +223,34 @@
 ### 3. Plan de Control e Integridad
 - Actualizado [[guidelines.md](file:///home/diegogto/Documents/Projects/Faberdoc/.agents/rules/guidelines.md)] documentando el sistema de diseño basado en la paleta de colores del logo.
 - Compilación del proyecto local verificada con éxito (`npm run build` finalizado exitosamente y con 0 errores).
+
+## [2026-05-31] Sesión 9: Solución de Recuperación de Contraseña, Optimización de Logs, Feedback de Formulario y Soporte para Gestores de Contraseña
+**Hora:** 11:10 (Local Time)  
+**Objetivo:** Ignorar localmente la carpeta `.agents/`, corregir la verbosidad de logs de correo en consola, implementar feedback visual contra doble clic en la recuperación de contraseña, arreglar problemas de OTP/enlace expirados, corregir la redirección proxy en producción (0.0.0.0:3000), agregar el logotipo institucional a todas las vistas de recuperación de contraseña, e integrar soporte explícito de email para gestores de contraseñas.
+
+### 1. Cambios en Código (Next.js & Frontend)
+- **Localización de Carpeta .agents**:
+  - Modificado [`.gitignore`](file:///home/diegogto/Documents/Projects/Faberdoc/.gitignore) agregando `.agents/`.
+  - Ejecutado `git rm -r --cached .agents` para remover el directorio del repositorio en Git manteniendo los archivos intactos localmente.
+- **Simplificación y Mejora de Logs de Email**:
+  - Modificado [[email.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/lib/email.ts)] para omitir el volcado completo de HTML de los correos en la consola en modo desarrollo/MOCK.
+  - Implementada extracción mediante regex para imprimir de manera limpia e intuitiva en la consola los enlaces de redirección detectados y el código OTP (temporal) de 6 dígitos.
+  - Corregido bug del detector de código OTP: el regex original colisionaba con colores CSS hexadecimales (como el gris de texto `#334155`). Se implementó un lookbehind negativo de JavaScript `(?<!#)\b\d{6}\b` para ignorar los códigos de color hexadecimales y capturar únicamente el OTP real del usuario.
+- **Feedback Visual y Prevención de Clics Múltiples**:
+  - Creado el componente de cliente [[forgot-password-client.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/forgot-password/forgot-password-client.tsx)] para gestionar el envío usando `useTransition`.
+  - Modificado [[page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/forgot-password/page.tsx)] para utilizar este nuevo formulario de cliente. El botón "Enviar enlace" ahora muestra un spinner y el texto "Enviando..." y se deshabilita instantáneamente, evitando clics duplicados del usuario que invaliden los OTP en Supabase.
+- **Soporte para Gestores de Contraseñas**:
+  - En [[reset-password-client.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/reset-password/reset-password-client.tsx)] y [[page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/reset-password/page.tsx)], se incorporó una prop para pasar el email del usuario desde el Server Component al Client Component.
+  - Añadido un campo visible de solo lectura con `name="email"` y `autoComplete="username"` que muestra explícitamente el email del usuario.
+  - Añadido `autoComplete="new-password"` a los campos de contraseña y confirmación de contraseña, permitiendo a gestores de contraseñas (1Password, Bitwarden, Chrome Autofill, etc.) asociar y guardar las credenciales actualizadas de forma transparente.
+- **Identidad de Marca**:
+  - Se importó y renderizó el componente de marca `<Logo className="h-20 w-auto" />` en lugar de los iconos de carpeta genéricos en las páginas [[forgot-password/page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/forgot-password/page.tsx)], [[forgot-password/verify/page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/forgot-password/verify/page.tsx)], y [[reset-password/page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(auth)/reset-password/page.tsx)].
+
+### 2. Cambios en Base de Datos e Infraestructura
+- **Redirección de Origen de Red en Producción**:
+  - En la ruta de redirección [[route.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/auth/confirm/route.ts)] se restableció la invocación de `getRequestOrigin()`.
+  - En [[server.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/lib/supabase/server.ts)], se actualizó la función `getRequestOrigin()` para detectar si estamos en desarrollo (`process.env.NODE_ENV === "development"`). De ser así, se ignora la cabecera `x-forwarded-host` de los proxys y se retorna `http://${host}`, garantizando que las pruebas en local permanezcan en `localhost:3000`. En producción (VPS), continúa leyendo `x-forwarded-host` para resolver correctamente `https://faberdoc.com` en lugar de la IP interna del contenedor (`0.0.0.0:3000`).
+
+### 3. Plan de Control e Integridad
+- Compilación del proyecto local verificada con éxito (`npm run build` finalizado exitosamente y con 0 errores).
+
