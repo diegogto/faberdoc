@@ -1,4 +1,4 @@
-import { FolderKanban } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 import ResetPasswordFormClient from "./reset-password-client";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -22,19 +22,19 @@ export default async function ResetPasswordPage({
     redirect("/login?error=session-expired");
   }
 
+  const email = user.email || "";
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm space-y-8">
         {/* Brand Header */}
         <div className="flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
-            <FolderKanban className="h-6 w-6" />
-          </div>
+          <Logo className="h-20 w-auto" />
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
               Establecer Nueva Contraseña
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mt-1 select-none">
               Ingresa una nueva contraseña segura para tu cuenta
             </p>
           </div>
@@ -50,7 +50,7 @@ export default async function ResetPasswordPage({
         )}
 
         {/* Reset Password Form */}
-        <ResetPasswordFormClient />
+        <ResetPasswordFormClient email={email} />
       </div>
     </div>
   );

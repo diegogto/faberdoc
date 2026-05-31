@@ -1,4 +1,4 @@
-import { FolderKanban } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 import ForgotPasswordFormClient from "./forgot-password-client";
 import Link from "next/link";
 
@@ -16,9 +16,7 @@ export default async function ForgotPasswordPage({
       <div className="w-full max-w-sm space-y-8">
         {/* Brand Header */}
         <div className="flex flex-col items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg">
-            <FolderKanban className="h-6 w-6" />
-          </div>
+          <Logo className="h-20 w-auto" />
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
               Recuperar Contraseña

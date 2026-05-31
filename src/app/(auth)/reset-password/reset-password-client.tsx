@@ -4,7 +4,7 @@ import { useState } from "react";
 import { resetPasswordAction } from "../login/actions";
 import { Eye, EyeOff } from "lucide-react";
 
-export default function ResetPasswordFormClient() {
+export default function ResetPasswordFormClient({ email }: { email: string }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [password, setPassword] = useState("");
@@ -28,6 +28,25 @@ export default function ResetPasswordFormClient() {
         </div>
       )}
 
+      {/* Email (Readonly for visual confirmation and password managers) */}
+      <div className="space-y-2">
+        <label
+          htmlFor="email"
+          className="text-sm font-medium text-foreground"
+        >
+          Cuenta de correo
+        </label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          value={email}
+          readOnly
+          autoComplete="username"
+          className="flex h-10 w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm text-muted-foreground ring-offset-background cursor-not-allowed select-all focus-visible:outline-none"
+        />
+      </div>
+
       <div className="space-y-2">
         <label
           htmlFor="password"
@@ -42,6 +61,7 @@ export default function ResetPasswordFormClient() {
             type={showPassword ? "text" : "password"}
             required
             minLength={6}
+            autoComplete="new-password"
             placeholder="••••••••"
             value={password}
             onChange={(e) => {
@@ -74,6 +94,7 @@ export default function ResetPasswordFormClient() {
             type={showConfirmPassword ? "text" : "password"}
             required
             minLength={6}
+            autoComplete="new-password"
             placeholder="••••••••"
             value={confirmPassword}
             onChange={(e) => {
