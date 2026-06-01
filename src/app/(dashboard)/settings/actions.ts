@@ -361,7 +361,10 @@ export async function updateOrganizationAction(formData: FormData) {
       };
     }
 
-    const { error } = await supabase
+    // adminClient bypasea RLS: la autorización ya fue validada por checkCallerIsAdmin().
+    // Sin esto, el UPDATE falla silenciosamente porque organizations no tiene política UPDATE.
+    const adminSupabase = createAdminClient();
+    const { error } = await adminSupabase
       .from("organizations")
       .update({
         name: validated.data.name,

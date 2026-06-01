@@ -81,6 +81,7 @@ export function SettingsClient({
   const activeTabParam = searchParams.get("tab") === "org" ? "org" : "profile";
 
   const [activeTab, setActiveTab] = useState<"profile" | "org">(activeTabParam);
+  const [showInviteForm, setShowInviteForm] = useState(false);
   
   // Sincronizar estado local con query params
   useEffect(() => {
@@ -169,12 +170,20 @@ export function SettingsClient({
     text: string;
   } | null>(null);
 
-  // Configuración de Organización (Admins)
+  // Configuración de Organización (Admins) — inputs controlados
+  const [orgName, setOrgName] = useState(organization.name);
+  const [orgLogoUrl, setOrgLogoUrl] = useState(organization.logo_url || "");
   const [orgUpdatePending, startOrgUpdateTransition] = useTransition();
   const [orgUpdateMessage, setOrgUpdateMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  // Sincronizar estado controlado cuando el prop cambia tras router.refresh()
+  useEffect(() => {
+    setOrgName(organization.name);
+    setOrgLogoUrl(organization.logo_url || "");
+  }, [organization.name, organization.logo_url]);
 
   const handleUpdateOrganization = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -398,6 +407,7 @@ export function SettingsClient({
                     name="full_name"
                     required
                     defaultValue={currentUser.full_name}
+                    key={currentUser.full_name}
                     placeholder="Ej. Juan Pérez"
                   />
                 </div>
@@ -481,18 +491,114 @@ export function SettingsClient({
 
       {activeTab === "org" && (
         <div className="space-y-8">
-          {/* Detalle Organización */}
-          <div className="bg-card border border-border rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Building className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="font-bold text-lg text-foreground">
-                  {organization.name}
-                </h3>
-              </div>
+          {/* Section 1: Información General de la Organización */}
+          <div className="bg-card border border-border rounded-xl p-6 space-y-6 shadow-xs">
+            <div>
+              <h3 className="text-lg font-bold text-foreground flex items-center gap-2 font-sans">
+                <Building className="h-5 w-5 text-primary shrink-0" />
+                Información General de la Organización
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Datos principales y logotipo identificador de la organización.
+              </p>
             </div>
+
+            {orgUpdateMessage && (
+              <div
+                className={`rounded-lg border p-3 text-sm text-center font-medium ${
+                  orgUpdateMessage.type === "success"
+                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : "border-destructive/30 bg-destructive/10 text-destructive"
+                }`}
+              >
+                {orgUpdateMessage.text}
+              </div>
+            )}
+
+            {currentUser.is_admin ? (
+              <form onSubmit={handleUpdateOrganization} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label htmlFor="org_name" className="text-xs font-semibold text-muted-foreground">
+                      Nombre de la Organización
+                    </label>
+                    <Input
+                      id="org_name"
+                      name="name"
+                      required
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      placeholder="Ej. Mi Empresa S.A."
+                      className="bg-white dark:bg-zinc-950 text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label htmlFor="org_logo_url" className="text-xs font-semibold text-muted-foreground">
+                      URL del Logotipo (HTTPS)
+                    </label>
+                    <Input
+                      id="org_logo_url"
+                      name="logo_url"
+                      type="url"
+                      value={orgLogoUrl}
+                      onChange={(e) => setOrgLogoUrl(e.target.value)}
+                      placeholder="https://ejemplo.com/logo.png"
+                      className="bg-white dark:bg-zinc-950 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 pt-2">
+                  <div>
+                    {organization.logo_url && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground">Vista previa:</span>
+                        <img
+                          src={organization.logo_url}
+                          alt="Logo org"
+                          className="h-8 max-w-[120px] object-contain border rounded p-1 bg-white"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={orgUpdatePending}
+                    className="text-xs px-6 cursor-pointer"
+                  >
+                    {orgUpdatePending && (
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                    )}
+                    Guardar Cambios
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-zinc-50/50 dark:bg-zinc-900/10 p-4 rounded-lg border border-border">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Nombre</span>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{organization.name}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Logotipo</span>
+                  <div className="mt-1">
+                    {organization.logo_url ? (
+                      <img
+                        src={organization.logo_url}
+                        alt={organization.name}
+                        className="h-8 max-w-[150px] object-contain border rounded p-1 bg-white"
+                      />
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">Sin logotipo cargado</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {orgMessage && (
@@ -507,244 +613,192 @@ export function SettingsClient({
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             {/* Columna de Miembros (Toma 2 slots) */}
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-card border border-border rounded-xl overflow-hidden">
-                <div className="p-6 border-b border-border">
-                  <h3 className="font-bold text-lg text-foreground">
-                    Miembros de la Organización
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Colaboradores que tienen acceso a los proyectos de la organización.
-                  </p>
+              <div className="bg-card border border-border rounded-xl overflow-hidden shadow-xs">
+                <div className="p-6 border-b border-border flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-base text-foreground">
+                      Miembros de la Organización
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Colaboradores que tienen acceso a los proyectos de la organización.
+                    </p>
+                  </div>
+                  
+                  {/* Collapsible Invitar Form Button */}
+                  {currentUser.is_admin && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowInviteForm(!showInviteForm)}
+                      className="text-xs gap-1.5 cursor-pointer"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      {showInviteForm ? "Ocultar Formulario" : "Invitar Miembro"}
+                    </Button>
+                  )}
                 </div>
 
-                <div className="divide-y divide-border">
-                  {orgUsers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between p-6 gap-4"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className="text-sm bg-primary/10 text-primary font-semibold">
-                            {getUserInitials(member.full_name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm text-foreground">
-                              {member.full_name}
+                {/* Collapsible Invite Form Box */}
+                {currentUser.is_admin && showInviteForm && (
+                  <div className="p-6 bg-zinc-50/50 dark:bg-zinc-900/10 border-b border-border space-y-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Invitar Nuevo Miembro</h4>
+                    <form onSubmit={handleInviteUser} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                      <div className="space-y-1.5">
+                        <label htmlFor="invite_email" className="text-xs font-semibold text-muted-foreground">
+                          Email corporativo
+                        </label>
+                        <Input
+                          id="invite_email"
+                          type="email"
+                          required
+                          placeholder="colaborador@empresa.com"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          className="bg-white dark:bg-zinc-950 text-xs h-9"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3 h-9">
+                        <div className="flex items-center justify-between gap-4 p-2 bg-white dark:bg-zinc-950 rounded-lg border border-border flex-1 h-full">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-foreground">
+                              Rol Administrador
                             </span>
-                            {member.id === currentUser.id && (
-                              <Badge variant="outline" className="text-[10px] py-0">
-                                Tú
-                              </Badge>
-                            )}
+                            <span className="text-[8px] text-muted-foreground">
+                              Gestión de miembros y org
+                            </span>
                           </div>
-                          <span className="text-xs text-muted-foreground block">
-                            {member.email}
-                          </span>
+                          <input
+                            type="checkbox"
+                            checked={inviteIsAdmin}
+                            onChange={(e) => setInviteIsAdmin(e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer shrink-0"
+                          />
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-3">
-                        <Badge
-                          variant={member.is_admin ? "default" : "secondary"}
+                        <Button
+                          type="submit"
+                          className="h-full text-xs font-semibold cursor-pointer px-4 shrink-0"
+                          disabled={orgPending || !inviteEmail}
                         >
-                          {member.is_admin ? "Administrador" : "Colaborador"}
-                        </Badge>
-
-                        {/* Acciones de Admin */}
-                        {currentUser.is_admin && member.id !== currentUser.id && (
-                          <div className="flex items-center gap-1.5">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 text-xs font-semibold cursor-pointer"
-                              onClick={() =>
-                                handleChangeRole(member.id, member.is_admin)
-                              }
-                              disabled={orgPending}
-                            >
-                              <Shield className="h-3.5 w-3.5 mr-1" />
-                              {member.is_admin ? "Quitar Admin" : "Hacer Admin"}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 text-destructive hover:bg-destructive/10 cursor-pointer"
-                              onClick={() =>
-                                handleRemoveUser(member.id, member.full_name)
-                              }
-                              disabled={orgPending}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        )}
+                          {orgPending ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            "Enviar"
+                          )}
+                        </Button>
                       </div>
-                    </div>
-                  ))}
+                    </form>
+                  </div>
+                )}
+
+                {/* Modern Table Layout for Members */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-muted/30 border-b border-border text-muted-foreground font-semibold">
+                        <th className="p-4">Colaborador</th>
+                        <th className="p-4 w-32">Rol</th>
+                        <th className="p-4 w-40 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {orgUsers.map((member) => (
+                        <tr key={member.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-900/10">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-9 w-9 rounded-lg shrink-0">
+                                <AvatarFallback className="text-xs bg-primary/10 text-primary font-bold rounded-lg">
+                                  {getUserInitials(member.full_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-zinc-900 dark:text-zinc-100 truncate text-sm">
+                                    {member.full_name}
+                                  </span>
+                                  {member.id === currentUser.id && (
+                                    <Badge variant="outline" className="text-[10px] py-0 px-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200">
+                                      Tú
+                                    </Badge>
+                                  )}
+                                </div>
+                                <span className="text-[11px] text-muted-foreground block truncate">
+                                  {member.email}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <Badge
+                              variant={member.is_admin ? "default" : "secondary"}
+                              className="text-[10px] font-semibold"
+                            >
+                              {member.is_admin ? "Administrador" : "Colaborador"}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-right">
+                            {/* Acciones de Admin */}
+                            {currentUser.is_admin && member.id !== currentUser.id ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-[10px] font-medium cursor-pointer px-2"
+                                  onClick={() =>
+                                    handleChangeRole(member.id, member.is_admin)
+                                  }
+                                  disabled={orgPending}
+                                  title={member.is_admin ? "Quitar rol administrador" : "Otorgar rol administrador"}
+                                >
+                                  <Shield className="h-3 w-3 mr-1" />
+                                  {member.is_admin ? "Hacer Colaborador" : "Hacer Admin"}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer"
+                                  onClick={() =>
+                                    handleRemoveUser(member.id, member.full_name)
+                                  }
+                                  disabled={orgPending}
+                                  title={`Remover a ${member.full_name} de la organización`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-zinc-400 text-[10px] italic">Sin acciones</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
 
             {/* Columna de Admin: Invitaciones e Ingresos */}
             <div className="lg:col-span-1 space-y-6">
-              {/* Configuración de la Organización (Solo Admins) */}
-              {currentUser.is_admin && (
-                <div className="bg-card border border-border rounded-xl p-6 space-y-6">
-                  <div>
-                    <h3 className="font-bold text-base text-foreground">
-                      Configuración de la Organización
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Actualiza el nombre y el logotipo de tu organización.
-                    </p>
-                  </div>
-
-                  {orgUpdateMessage && (
-                    <div
-                      className={`rounded-lg border p-3 text-sm text-center font-medium ${
-                        orgUpdateMessage.type === "success"
-                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                          : "border-destructive/30 bg-destructive/10 text-destructive"
-                      }`}
-                    >
-                      {orgUpdateMessage.text}
-                    </div>
-                  )}
-
-                  <form onSubmit={handleUpdateOrganization} className="space-y-4">
-                    <div className="space-y-2">
-                      <label htmlFor="org_name" className="text-xs font-medium">
-                        Nombre de la Organización
-                      </label>
-                      <Input
-                        id="org_name"
-                        name="name"
-                        required
-                        defaultValue={organization.name}
-                        placeholder="Ej. Mi Empresa S.A."
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label htmlFor="org_logo_url" className="text-xs font-medium">
-                        URL del Logotipo (HTTPS)
-                      </label>
-                      <Input
-                        id="org_logo_url"
-                        name="logo_url"
-                        type="url"
-                        defaultValue={organization.logo_url || ""}
-                        placeholder="https://ejemplo.com/logo.png"
-                      />
-                      {organization.logo_url && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <span className="text-[10px] text-muted-foreground">Vista previa:</span>
-                          <img
-                            src={organization.logo_url}
-                            alt="Logo org"
-                            className="h-8 max-w-[120px] object-contain border rounded p-1 bg-white"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full text-xs font-semibold"
-                      disabled={orgUpdatePending}
-                    >
-                      {orgUpdatePending && (
-                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                      )}
-                      Guardar Cambios
-                    </Button>
-                  </form>
-                </div>
-              )}
-
-              {/* Formulario Invitar Usuario */}
-              {currentUser.is_admin && (
-                <div className="bg-card border border-border rounded-xl p-6 space-y-6">
-                  <div>
-                    <h3 className="font-bold text-base text-foreground">
-                      Invitar Nuevo Miembro
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Envía una invitación por correo a tu dominio.
-                    </p>
-                  </div>
-
-                  <form onSubmit={handleInviteUser} className="space-y-4">
-                    <div className="space-y-2">
-                      <label htmlFor="invite_email" className="text-xs font-medium">
-                        Email del colaborador
-                      </label>
-                      <Input
-                        id="invite_email"
-                        type="email"
-                        required
-                        placeholder="ejemplo@empresa.com"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4 p-2 bg-accent/20 rounded-lg border border-border">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-foreground">
-                          Otorgar rol de Administrador
-                        </span>
-                        <span className="text-[10px] text-muted-foreground">
-                          Podrá invitar y gestionar miembros
-                        </span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={inviteIsAdmin}
-                        onChange={(e) => setInviteIsAdmin(e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                      />
-                    </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full text-xs font-semibold"
-                      disabled={orgPending || !inviteEmail}
-                    >
-                      {orgPending ? (
-                        <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <UserPlus className="mr-2 h-3.5 w-3.5" />
-                      )}
-                      Enviar Invitación
-                    </Button>
-                  </form>
-                </div>
-              )}
-
               {/* Solicitudes de Acceso (Solo Admins) */}
               {currentUser.is_admin && (
-                <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+                <div className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-xs">
                   <div>
-                    <h3 className="font-bold text-base text-foreground">
+                    <h3 className="font-bold text-base text-foreground flex items-center gap-2 font-sans">
+                      <UserCheck className="h-4.5 w-4.5 text-zinc-500 shrink-0" />
                       Solicitudes de Acceso
                     </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Usuarios con tu dominio que desean entrar.
+                      Usuarios de tu mismo dominio que desean ingresar.
                     </p>
                   </div>
 
                   {joinRequests.length === 0 ? (
-                    <p className="text-xs text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg bg-accent/10">
+                    <p className="text-xs text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg bg-zinc-50/50 dark:bg-zinc-900/10">
                       No hay solicitudes pendientes.
                     </p>
                   ) : (
@@ -752,17 +806,17 @@ export function SettingsClient({
                       {joinRequests.map((req) => (
                         <div
                           key={req.id}
-                          className="p-3 border border-border rounded-lg bg-accent/10 flex flex-col gap-2"
+                          className="p-3 border border-border rounded-lg bg-zinc-50/50 dark:bg-zinc-900/10 flex flex-col gap-2"
                         >
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold text-foreground">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-bold text-foreground truncate">
                               {req.users?.full_name ?? "Usuario"}
                             </span>
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-[10px] text-muted-foreground truncate">
                               {req.users?.email ?? ""}
                             </span>
                           </div>
-                          <div className="flex gap-1.5 justify-end">
+                          <div className="flex gap-1.5 justify-end pt-1">
                             <Button
                               size="sm"
                               variant="outline"
@@ -802,18 +856,19 @@ export function SettingsClient({
 
               {/* Invitaciones Pendientes (Solo Admins) */}
               {currentUser.is_admin && (
-                <div className="bg-card border border-border rounded-xl p-6 space-y-4">
+                <div className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-xs">
                   <div>
-                    <h3 className="font-bold text-base text-foreground">
+                    <h3 className="font-bold text-base text-foreground flex items-center gap-2 font-sans">
+                      <Mail className="h-4.5 w-4.5 text-zinc-500 shrink-0" />
                       Invitaciones Pendientes
                     </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Invitaciones enviadas que aún no han sido aceptadas.
+                      Correos con invitaciones enviadas y pendientes.
                     </p>
                   </div>
 
                   {invitations.length === 0 ? (
-                    <p className="text-xs text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg bg-accent/10">
+                    <p className="text-xs text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg bg-zinc-50/50 dark:bg-zinc-900/10">
                       No hay invitaciones pendientes.
                     </p>
                   ) : (
@@ -821,17 +876,17 @@ export function SettingsClient({
                       {invitations.map((invite) => (
                         <div
                           key={invite.id}
-                          className="flex items-center justify-between p-3 border border-border rounded-lg bg-accent/5 gap-2"
+                          className="flex items-center justify-between p-3 border border-border rounded-lg bg-zinc-50/30 dark:bg-zinc-900/5 gap-2"
                         >
                           <div className="flex flex-col min-w-0">
                             <span className="text-xs font-semibold text-foreground truncate">
                               {invite.email}
                             </span>
                             <span className="text-[10px] text-muted-foreground">
-                              {invite.is_admin ? "Admin" : "Colaborador"}
+                              {invite.is_admin ? "Administrador" : "Colaborador"}
                             </span>
                           </div>
-                          <Badge variant="outline" className="text-[10px]">
+                          <Badge variant="outline" className="text-[10px] bg-white dark:bg-zinc-950 shrink-0">
                             Pendiente
                           </Badge>
                         </div>

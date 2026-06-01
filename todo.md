@@ -20,6 +20,12 @@
 - [x] Configuración del Naming Engine (patrón dinámico como `{PROY}-{ESP}-{NUM}`)
 - [x] Optimizar la vista de configuración de un proyecto (hacerla más amigable, explicativa y dinámica)
   - [x] Rediseñar el configurador de código de documento (Naming Engine) para evitar el ingreso manual de brackets (`{...}`) mediante una interfaz visual con chips o constructores de patrones interactivos
+- [ ] Completar y reordenar pantalla de configuración del proyecto:
+  - [ ] Información del proyecto: nombre, descripción, ubicación, cliente, etc.
+  - [ ] Configuración detallada de nomenclatura (separar código interno de documento vs código emitido con versión/emisión)
+  - [ ] Configurar formatos de versión/emisión (especificar para MIXED y SEPARATE_EMISSION)
+  - [ ] Finalizar el configurador del flujo de revisión y revisiones
+  - [ ] Mejorar la sección para administrar miembros del proyecto (roles, adición, eliminación)
 
 ## IV. Master Delivery List (MDL)
 - [x] Tabla principal interactiva (TanStack Table v8 + TanStack Query)
@@ -57,6 +63,7 @@
 - [x] BUG: Corrección de redirección rota en el callback `/auth/confirm` en producción detrás de proxies inversos (redireccionaba a `https://0.0.0.0:3000`).
 - [x] MEJORA: Evitar reenvíos múltiples de recuperación (doble clic) en `/forgot-password` usando `useTransition` y un botón con estado de carga ("Enviando...").
 - [x] MEJORA: Mostrar explícitamente el correo al cual se le está restableciendo la clave en `/reset-password` y configurar los inputs para ser reconocidos automáticamente por gestores de contraseñas (`autoComplete="username"` y `autoComplete="new-password"`).
+- [ ] Mejorar y ordenar la configuración del usuario y de la organización (para los administradores de la organización) en `/settings`
 
 ## IX. Plantillas de Correo e Imagen de Marca
 - [x] Diseñar formatos HTML atractivos y profesionales para los correos (registro de usuario, invitaciones de equipo, recuperación de contraseña, etc.)

@@ -12,6 +12,8 @@ import {
   getDocumentApprovedEmailHtml,
 } from "@/lib/email-templates";
 
+import { formatIterationLabel } from "@/lib/version-utils";
+
 // Helper helper to generate letter label for an index (0 -> A, 1 -> B, etc.)
 function getLetterForIndex(index: number): string {
   let temp = index;
@@ -97,12 +99,8 @@ export async function createNextRevisionAction(projectId: string, documentId: st
       nextIndex = latestRev.version_index + 1;
     }
 
-    if (project.versioning_logic === "SEPARATE_EMISSION") {
-      nextLabel = `Rev ${nextIndex + 1}`;
-    } else {
-      // MIXED logic: letter for draft internal, number for issued
-      nextLabel = getLetterForIndex(nextIndex);
-    }
+    // Internal revision label is always a simple sequential iteration index (1, 2, 3...)
+    nextLabel = formatIterationLabel(nextIndex);
 
     // 3. Create the new revision
     const { data: newRev, error: createError } = await adminSupabase

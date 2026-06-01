@@ -30,7 +30,7 @@ interface CustomPropertyDef {
   key: string;
   label: string;
   type: string;
-  options?: string[];
+  options?: Array<{ value: string; code: string } | string>;
 }
 
 interface FlowConfigManagerProps {
@@ -460,11 +460,14 @@ export function FlowConfigManager({
                               className="h-8 text-xs rounded-md border bg-white dark:bg-zinc-950 p-1 flex-1 cursor-pointer"
                             >
                               <option value="">Seleccionar valor...</option>
-                              {propDef.options.map((opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              ))}
+                              {propDef.options.map((opt, i) => {
+                                const valStr = typeof opt === "string" ? opt : opt.value;
+                                return (
+                                  <option key={i} value={valStr}>
+                                    {valStr}
+                                  </option>
+                                );
+                              })}
                             </select>
                           ) : (
                             <Input

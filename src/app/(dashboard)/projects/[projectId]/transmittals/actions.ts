@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/email";
 import { getTransmittalEmailHtml } from "@/lib/email-templates";
+import { formatVersionLabel } from "@/lib/version-utils";
 
 /**
  * Verifies if user has edit rights for a project
@@ -65,6 +66,13 @@ export async function getEligibleRevisionsAction(projectId: string) {
   const adminSupabase = createAdminClient();
 
   try {
+    // Load project versioning config to determine emission types
+    const { data: project } = await adminSupabase
+      .from("projects")
+      .select("versioning_format_config")
+      .eq("id", projectId)
+      .single();
+
     const { data: docs, error } = await adminSupabase
       .from("documents")
       .select(`
@@ -103,7 +111,7 @@ export async function getEligibleRevisionsAction(projectId: string) {
       })
       .filter((item): item is NonNullable<typeof item> => item !== null);
 
-    return { eligible };
+    return { eligible, versioningFormatConfig: project?.versioning_format_config || null };
   } catch (err) {
     console.error("Excepción al listar revisiones elegibles:", err);
     return { error: "Error inesperado al buscar documentos." };
@@ -137,10 +145,10 @@ export async function createTransmittalAction(
   const adminSupabase = createAdminClient();
 
   try {
-    // 1. Get project versioning logic
+    // 1. Get project versioning logic and configuration
     const { data: project, error: projError } = await adminSupabase
       .from("projects")
-      .select("versioning_logic")
+      .select("versioning_logic, versioning_format_config")
       .eq("id", projectId)
       .single();
 
@@ -199,7 +207,7 @@ export async function createTransmittalAction(
           })
           .eq("id", revisionId);
       } else {
-        // MIXED: Convert letter label (A, B, C...) to next sequential numeric label (0, 1, 2...)
+        // MIXED: Convert iteration numeric label to formatted official version label
         const { data: rev } = await adminSupabase
           .from("revisions")
           .select("document_id")
@@ -207,31 +215,31 @@ export async function createTransmittalAction(
           .single();
 
         if (rev) {
-          // Find all previously ISSUED revisions for this document to determine the next number
-          const { data: issuedRevs } = await adminSupabase
+          // Count previously ISSUED revisions to get the next versionIndex
+          const { count: issuedCount } = await adminSupabase
             .from("revisions")
-            .select("version_label")
+            .select("id", { count: "exact", head: true })
             .eq("document_id", rev.document_id)
             .eq("status", "ISSUED");
 
-          let nextNumericLabel = 0;
-          if (issuedRevs && issuedRevs.length > 0) {
-            const numericLabels = issuedRevs
-              .map((r) => parseInt(r.version_label, 10))
-              .filter((val) => !isNaN(val));
+          const emissionTypes = project.versioning_format_config?.emission_types || [];
+          const foundType = emissionTypes.find((et: any) => et.code === emissionCode);
+          const emissionPurpose: "info" | "approved" = foundType?.type === "approved" ? "approved" : "info";
 
-            if (numericLabels.length > 0) {
-              nextNumericLabel = Math.max(...numericLabels) + 1;
-            }
-          }
-
-          const nextLabel = String(nextNumericLabel);
+          const versionIndex = issuedCount ?? 0;
+          const nextLabel = formatVersionLabel(
+            versionIndex,
+            project.versioning_logic,
+            emissionPurpose,
+            project.versioning_format_config
+          );
 
           await adminSupabase
             .from("revisions")
             .update({
               status: "ISSUED",
               version_label: nextLabel,
+              emission_code: (emissionCode || "B").trim(),
             })
             .eq("id", revisionId);
         }

@@ -27,6 +27,7 @@ interface ProjectTeamPanelProps {
   projectId: string;
   currentUserId: string;
   isCurrentUserAdmin: boolean;
+  isProjectCoordinator: boolean;
   members: ProjectMemberRow[];
   orgMembers: OrgMemberRow[];
 }
@@ -70,6 +71,7 @@ export function ProjectTeamPanel({
   projectId,
   currentUserId,
   isCurrentUserAdmin,
+  isProjectCoordinator,
   members: initialMembers,
   orgMembers,
 }: ProjectTeamPanelProps) {
@@ -79,6 +81,8 @@ export function ProjectTeamPanel({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const hasEditRights = isCurrentUserAdmin || isProjectCoordinator;
 
   // Users from org not yet in the project
   const memberIds = new Set(members.map((m) => m.user_id));
@@ -151,115 +155,12 @@ export function ProjectTeamPanel({
         </div>
       )}
 
-      {/* Current members list */}
-      <div className="space-y-2">
-        {members.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-400 gap-2">
-            <Users className="h-8 w-8 opacity-40" />
-            <p className="text-sm">Este proyecto no tiene miembros asignados aún.</p>
-          </div>
-        ) : (
-          members.map((member) => {
-            const isSelf = member.user_id === currentUserId;
-            return (
-              <div
-                key={member.user_id}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/20 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/40 transition-colors"
-              >
-                {/* Avatar placeholder */}
-                <div className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center shrink-0">
-                  <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300 uppercase">
-                    {member.full_name?.charAt(0) ?? "?"}
-                  </span>
-                </div>
-
-                {/* Name & email */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
-                    {member.full_name}
-                    {isSelf && (
-                      <span className="ml-2 text-xs text-zinc-400 font-normal">(tú)</span>
-                    )}
-                  </p>
-                  {member.email && (
-                    <p className="text-xs text-zinc-400 truncate">{member.email}</p>
-                  )}
-                </div>
-
-                {/* Role selector (admin only) */}
-                {isCurrentUserAdmin && !isSelf ? (
-                  <select
-                    value={member.role}
-                    onChange={(e) => handleRoleChange(member.user_id, e.target.value as ProjectRole)}
-                    disabled={isPending}
-                    className="text-xs h-7 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 px-2 pr-6 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-                  >
-                    {ALL_ROLES.map((r) => (
-                      <option key={r} value={r} className="text-zinc-900">
-                        {ROLE_LABELS[r]}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <Badge
-                    variant="outline"
-                    className={`text-xs font-semibold ${ROLE_BADGE_CLASSES[member.role]}`}
-                  >
-                    <ShieldCheck className="h-3 w-3 mr-1" />
-                    {ROLE_LABELS[member.role]}
-                  </Badge>
-                )}
-
-                {/* Remove button (admin only, not self) */}
-                {isCurrentUserAdmin && !isSelf && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer"
-                    onClick={() => handleRemoveMember(member.user_id, member.full_name)}
-                    disabled={isPending}
-                    title={`Remover a ${member.full_name}`}
-                  >
-                    {isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* Role legend */}
-      <div className="rounded-lg border border-zinc-100 dark:border-zinc-800 p-4 space-y-2">
-        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-3">
-          Descripción de roles
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {ALL_ROLES.map((role) => (
-            <div key={role} className="flex items-start gap-2">
-              <Badge
-                variant="outline"
-                className={`text-[10px] font-semibold shrink-0 mt-0.5 ${ROLE_BADGE_CLASSES[role]}`}
-              >
-                {ROLE_LABELS[role]}
-              </Badge>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">{ROLE_DESCRIPTIONS[role]}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Add new member section (admin only) */}
-      {isCurrentUserAdmin && availableToAdd.length > 0 && (
+      {/* Add new member section (at the TOP, only if hasEditRights) */}
+      {hasEditRights && availableToAdd.length > 0 && (
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 space-y-4 bg-zinc-50/30 dark:bg-zinc-900/10">
           <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
-            <UserPlus className="h-4 w-4" />
-            Agregar miembro al proyecto
+            <UserPlus className="h-4 w-4 text-primary" />
+            Agregar miembro de tu organización al proyecto
           </p>
 
           <div className="flex flex-col sm:flex-row gap-2">
@@ -312,11 +213,98 @@ export function ProjectTeamPanel({
       )}
 
       {/* No org members to add */}
-      {isCurrentUserAdmin && availableToAdd.length === 0 && members.length > 0 && (
-        <p className="text-xs text-zinc-400 italic text-center py-2">
+      {hasEditRights && availableToAdd.length === 0 && members.length > 0 && (
+        <p className="text-xs text-zinc-400 italic text-center py-2 bg-zinc-50/50 dark:bg-zinc-900/10 border border-dashed border-border rounded-lg">
           Todos los miembros de tu organización ya forman parte de este proyecto.
         </p>
       )}
+
+      {/* Current members list */}
+      <div className="space-y-2">
+        <p className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider pl-1 mb-2">
+          Miembros del Equipo ({members.length})
+        </p>
+        {members.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-400 gap-2">
+            <Users className="h-8 w-8 opacity-40" />
+            <p className="text-sm">Este proyecto no tiene miembros asignados aún.</p>
+          </div>
+        ) : (
+          members.map((member) => {
+            const isSelf = member.user_id === currentUserId;
+            return (
+              <div
+                key={member.user_id}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg border border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/20 hover:bg-zinc-100/60 dark:hover:bg-zinc-900/40 transition-colors"
+              >
+                {/* Avatar placeholder */}
+                <div className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-bold text-zinc-600 dark:text-zinc-300 uppercase">
+                    {member.full_name?.charAt(0) ?? "?"}
+                  </span>
+                </div>
+
+                {/* Name & email */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate">
+                    {member.full_name}
+                    {isSelf && (
+                      <span className="ml-2 text-xs text-zinc-400 font-normal">(tú)</span>
+                    )}
+                  </p>
+                  {member.email && (
+                    <p className="text-xs text-zinc-400 truncate">{member.email}</p>
+                  )}
+                </div>
+
+                {/* Role selector (edit rights required) */}
+                {hasEditRights && !isSelf ? (
+                  <select
+                    value={member.role}
+                    onChange={(e) => handleRoleChange(member.user_id, e.target.value as ProjectRole)}
+                    disabled={isPending}
+                    className="text-xs h-7 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 text-zinc-700 dark:text-zinc-300 px-2 pr-6 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                  >
+                    {ALL_ROLES.map((r) => (
+                      <option key={r} value={r} className="text-zinc-900">
+                        {ROLE_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Badge
+                    variant="outline"
+                    className={`text-xs font-semibold ${ROLE_BADGE_CLASSES[member.role]}`}
+                  >
+                    <ShieldCheck className="h-3 w-3 mr-1" />
+                    {ROLE_LABELS[member.role]}
+                  </Badge>
+                )}
+
+                {/* Remove button (edit rights required, not self) */}
+                {hasEditRights && !isSelf && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer"
+                    onClick={() => handleRemoveMember(member.user_id, member.full_name)}
+                    disabled={isPending}
+                    title={`Remover a ${member.full_name}`}
+                  >
+                    {isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
     </div>
   );
 }

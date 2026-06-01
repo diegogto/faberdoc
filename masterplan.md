@@ -94,11 +94,14 @@ CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     organization_id UUID REFERENCES organizations(id),
     name VARCHAR(255) NOT NULL,
+    description TEXT,
+    location VARCHAR(255),
+    client_name VARCHAR(255),
     naming_pattern VARCHAR(255) NOT NULL,
     versioning_logic VARCHAR(50) DEFAULT 'MIXED' CHECK (versioning_logic IN ('MIXED', 'SEPARATE_EMISSION')),
+    versioning_format_config JSONB DEFAULT '{}'::JSONB,
     review_flow_config JSONB DEFAULT '{}'::JSONB,
     custom_properties_definition JSONB NOT NULL,
-    client_info JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     deleted_at TIMESTAMPTZ
 );
@@ -186,12 +189,16 @@ CREATE TABLE comments (
 3. **Master Delivery List (MDL):** Tabla interactiva principal. Al hacer click en una fila, se abre un Sheet (Drawer lateral) mostrando los metadatos JSONB y la línea de tiempo de revisiones.
 4. **Flujo de Revisión, Aprobación y Emisión (Transmittal):**
    - **Carga de Archivo (Upload):** El usuario sube el archivo a un adaptador de almacenamiento abstracto (`StorageService`). Esto permite cambiar de proveedor de almacenamiento (Supabase Storage, S3, etc.) de manera modular sin tocar el código del frontend.
-   - **Estados del Documento:**
-     - **Estado Interno:** Sigue el flujo de control documental del proyecto (ej: `DRAFT` -> `IN_REVIEW` -> `APPROVED`). Es gestionado internamente por el equipo.
-     - **Estado Externo (Emisión):** Representa el estado de emisión formal a terceros, indicado por la versión y el código del Transmittal al pasar la revisión a `ISSUED`.
-   - **Lógicas de Versionamiento (Configurables por Proyecto al crearlo/configurarlo):**
-     - **Lógica 1 (MIXED):** El documento avanza secuencialmente en letras (`A` -> `B` -> `C`...) mientras se encuentra en estado interno (borradores/revisiones internas). En el momento en que se aprueba y emite formalmente a través de un Transmittal, la versión del documento cambia/inicia con un número (ej. `0` o `01`), y las subsiguientes actualizaciones avanzan numéricamente (`1`, `2`... o `02`, `03`...).
-     - **Lógica 2 (SEPARATE_EMISSION):** El documento avanza numéricamente en su versión/revisión interna de forma secuencial (`Rev 1` -> `Rev 2` -> `Rev 3`...) cada vez que se sube un nuevo archivo. Por separado, existe un código o etiqueta de emisión (`emission_code`) que representa el estado externo (ej. `A`, `B` o texto personalizado), el cual es indicado/asignado por el usuario en el momento de realizar el envío/Transmittal.
+   - **Estados y Nomenclatura del Documento:**
+      - **Iteración (Revisión Interna):** Mientras el documento se está elaborando y revisando internamente (estados `DRAFT`, `IN_REVIEW`, `COMMENTED`, `APPROVED`), no es una versión formalmente emitida. Se le denomina **Iteración** y avanza de forma numérica simple (1, 2, 3...) sin configuraciones de formato complejas.
+      - **Versión / Emisión (Envío Formal):** Al ser emitido mediante un Transmittal (estado `ISSUED`), se le asigna una versión oficial (código/número formateado) y/o etiqueta de emisión.
+   - **Lógicas de Versionamiento (Configurables por Proyecto):**
+      - **Lógica 1 (MIXED):** El documento avanza numéricamente en su **Iteración** interna de elaboración. Al ser aprobado y emitido mediante un Transmittal, se calcula su **Versión** final basada en un formato configurable (letras o números, padding, valor de inicio como `0` o `01`). La versión se mapea con una tabla de **Tipos de Emisión** configurables en el proyecto (ej. "Para Revisión, Código B", "Apto para construcción, Código IFC", "As Built, Código ASB"), de forma que la versión avanza automáticamente en base a la última emisión formal.
+      - **Lógica 2 (SEPARATE_EMISSION):** El documento avanza numéricamente en su **Iteración** de elaboración. Al emitirse, mantiene su número de versión (formateado con prefijo/padding configurado) y se le asocia un código o etiqueta de emisión externa (`emission_code`) ingresado o seleccionado por el usuario.
+   - **Conexiones de Clientes Externos y Privacidad:**
+      - Para evitar exponer todas las organizaciones registradas en la plataforma, las empresas clientes/receptoras se vinculan mediante búsqueda directa de dominio/email.
+      - Si el cliente ya está registrado, se le envía una solicitud segura de vinculación a su administrador.
+      - Si el cliente no existe, se crea una *Ficha Temporal de Cliente* y se le envía una invitación para que registre su organización y reclame su acceso al proyecto, promoviendo la adopción orgánica de la plataforma de forma privada.
    - **Transmittals:** Agrupación formal e inmutable de una o más revisiones aprobadas enviadas a una organización externa, lo que cambia automáticamente el estado de las revisiones de `APPROVED` a `ISSUED`.
    - **Cierre de Comentarios:** Al generar una nueva revisión, todos los comentarios con estado `OPEN` de la versión anterior se copian automáticamente a la nueva versión.
 

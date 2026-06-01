@@ -8,6 +8,7 @@ import {
   joinExistingOrgAction,
   acceptInvitationAction,
   cancelJoinRequestAction,
+  claimOrgAction,
 } from "./actions";
 import { logoutAction } from "@/app/(auth)/login/actions";
 
@@ -100,6 +101,20 @@ export function OnboardingClient({
       } else {
         setSuccessMsg("Solicitud cancelada correctamente.");
         window.location.reload(); // Recargar para volver a la pantalla inicial de onboarding
+      }
+    });
+  };
+
+  const handleClaimOrg = (orgId: string) => {
+    setError(null);
+    setSuccessMsg(null);
+    startTransition(async () => {
+      const res = await claimOrgAction(orgId);
+      if (res.error) {
+        setError(res.error);
+      } else {
+        setSuccessMsg("¡Organización reclamada con éxito!");
+        window.location.reload();
       }
     });
   };
@@ -237,14 +252,14 @@ export function OnboardingClient({
                   <AlertTriangle className="h-5 w-5" />
                 </div>
                 <h2 className="text-lg font-semibold tracking-tight text-foreground">
-                  ¡Tu empresa ya está en Faberdoc!
+                  {members.length > 0 ? "¡Tu empresa ya está en Faberdoc!" : "¡Tu empresa te está esperando!"}
                 </h2>
                 <p className="mt-2 text-xs text-muted-foreground">
                   Detectamos que tu dominio{" "}
                   <strong className="font-semibold text-foreground">
                     @{corporateDomain}
                   </strong>{" "}
-                  está asociado a la organización ya registrada:
+                  está asociado a la organización registrada:
                 </p>
                 <div className="mt-3 w-full rounded-lg border border-input bg-muted/30 px-3 py-2 text-sm font-bold text-foreground text-center">
                   {existingOrg.name}
@@ -268,26 +283,43 @@ export function OnboardingClient({
                   </div>
                 ) : (
                   <div className="rounded-lg border border-border bg-background p-3 text-center text-xs text-muted-foreground">
-                    No se encontraron miembros activos.
+                    Esta organización fue creada temporalmente para colaborar. ¡Puedes reclamarla ahora y unirte como su Administrador!
                   </div>
                 )}
               </div>
 
               <div className="pt-1 space-y-3">
-                <button
-                  onClick={() => handleRequestJoin(existingOrg.id)}
-                  disabled={isPending}
-                  className="group flex w-full h-10 items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] shadow-md shadow-primary/10 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
-                >
-                  {isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      Solicitar Acceso a la Organización
-                      <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </>
-                  )}
-                </button>
+                {members.length > 0 ? (
+                  <button
+                    onClick={() => handleRequestJoin(existingOrg.id)}
+                    disabled={isPending}
+                    className="group flex w-full h-10 items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] shadow-md shadow-primary/10 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+                  >
+                    {isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        Solicitar Acceso a la Organización
+                        <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleClaimOrg(existingOrg.id)}
+                    disabled={isPending}
+                    className="group flex w-full h-10 items-center justify-center gap-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98] shadow-md shadow-primary/10 disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+                  >
+                    {isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        Reclamar y Unirse como Administrador
+                        <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </>
+                    )}
+                  </button>
+                )}
 
                 <button
                   onClick={handleLogout}

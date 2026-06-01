@@ -78,7 +78,7 @@ export async function getDashboardDataAction(): Promise<{ data?: DashboardData; 
         project:projects(
           id,
           name,
-          organization:organizations(name)
+          organization:organizations!projects_organization_id_fkey(name)
         )
       `)
       .eq("user_id", user.id);

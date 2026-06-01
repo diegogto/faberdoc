@@ -48,6 +48,7 @@ export function CreateTransmittalDialog({
   const [selectedRevisionIds, setSelectedRevisionIds] = useState<string[]>([]);
   const [recipientOrgId, setRecipientOrgId] = useState("");
   const [emissionCode, setEmissionCode] = useState("A");
+  const [emissionTypes, setEmissionTypes] = useState<Array<{ name: string; code: string }>>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -59,7 +60,7 @@ export function CreateTransmittalDialog({
     setErrorMsg(null);
     setSelectedRevisionIds([]);
     setRecipientOrgId("");
-    setEmissionCode("A");
+    setEmissionCode(versioningLogic === "SEPARATE_EMISSION" ? "A" : "");
     setSearchTerm("");
     setIsLoading(true);
 
@@ -78,10 +79,18 @@ export function CreateTransmittalDialog({
 
         if (revRes.error) {
           setErrorMsg(revRes.error);
-        } else if (revRes.eligible) {
-          // Solamente mostrar las revisiones que estén en estado APPROVED
-          const approvedOnly = revRes.eligible.filter((r) => r.status === "APPROVED");
-          setRevisions(approvedOnly);
+        } else {
+          if (revRes.eligible) {
+            // Solamente mostrar las revisiones que estén en estado APPROVED
+            const approvedOnly = revRes.eligible.filter((r: any) => r.status === "APPROVED");
+            setRevisions(approvedOnly);
+          }
+          if (revRes.versioningFormatConfig?.emission_types) {
+            setEmissionTypes(revRes.versioningFormatConfig.emission_types);
+            if (revRes.versioningFormatConfig.emission_types.length > 0 && versioningLogic === "MIXED") {
+              setEmissionCode(revRes.versioningFormatConfig.emission_types[0].code);
+            }
+          }
         }
       } catch (err) {
         setErrorMsg("Error al cargar los datos del transmittal.");
@@ -91,7 +100,7 @@ export function CreateTransmittalDialog({
     }
 
     loadData();
-  }, [isOpen, projectId]);
+  }, [isOpen, projectId, versioningLogic]);
 
   const handleToggleSelect = (revId: string) => {
     setSelectedRevisionIds((prev) =>
@@ -124,6 +133,10 @@ export function CreateTransmittalDialog({
       setErrorMsg("Selecciona al menos un documento para enviar.");
       return;
     }
+    if (versioningLogic === "MIXED" && !emissionCode) {
+      setErrorMsg("Selecciona un tipo de emisión.");
+      return;
+    }
 
     setErrorMsg(null);
     startTransition(async () => {
@@ -131,7 +144,7 @@ export function CreateTransmittalDialog({
         projectId,
         recipientOrgId,
         selectedRevisionIds,
-        versioningLogic === "SEPARATE_EMISSION" ? emissionCode : undefined
+        emissionCode
       );
 
       if (res.error) {
@@ -196,8 +209,8 @@ export function CreateTransmittalDialog({
               </select>
             </div>
 
-            {/* Emission Code (Only for SEPARATE_EMISSION) */}
-            {versioningLogic === "SEPARATE_EMISSION" && (
+            {/* Emission Code / Purpose (SEPARATE_EMISSION or MIXED) */}
+            {versioningLogic === "SEPARATE_EMISSION" ? (
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="emission-code-input" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                   Código de Emisión (Ej: A, B, C, AP)
@@ -212,6 +225,30 @@ export function CreateTransmittalDialog({
                 />
                 <p className="text-[11px] text-muted-foreground">
                   Se asignará esta etiqueta de emisión a todos los documentos seleccionados.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="emission-type-select" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Propósito / Tipo de Emisión
+                </label>
+                <select
+                  id="emission-type-select"
+                  value={emissionCode}
+                  onChange={(e) => setEmissionCode(e.target.value)}
+                  disabled={isPending}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50 cursor-pointer"
+                  required
+                >
+                  <option value="">Selecciona tipo de emisión...</option>
+                  {emissionTypes.map((et) => (
+                    <option key={et.code} value={et.code} className="text-zinc-900">
+                      {et.name} ({et.code})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-muted-foreground">
+                  Se asociará este propósito de emisión al transmittal y se calculará la versión externa correspondiente.
                 </p>
               </div>
             )}

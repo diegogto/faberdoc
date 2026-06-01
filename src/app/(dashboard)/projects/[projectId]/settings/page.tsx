@@ -1,10 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { SettingsForm } from "./settings-form";
-import { ProjectTeamPanel } from "./project-team-panel";
-import { FlowConfigManager } from "@/components/flow-editor/FlowConfigManager";
+import { SettingsTabsClient } from "./settings-tabs-client";
+import { getProjectClientsAction } from "./client-actions";
 
 interface SettingsPageProps {
   params: Promise<{ projectId: string }>;
@@ -18,10 +15,12 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
   const { data: { user: authUser } } = await supabase.auth.getUser();
   if (!authUser) notFound();
 
-  // Load project
+  // Load project including new explicit columns
   const { data: project } = await supabase
     .from("projects")
-    .select("id, name, naming_pattern, versioning_logic, review_flow_config, custom_properties_definition, client_info, organization_id")
+    .select(
+      "id, name, naming_pattern, versioning_logic, review_flow_config, custom_properties_definition, organization_id, description, location, location_details, client_name, versioning_format_config"
+    )
     .eq("id", projectId)
     .is("deleted_at", null)
     .single();
@@ -35,20 +34,20 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
     .eq("id", authUser.id)
     .single();
 
-  const isCurrentUserAdmin =
-    currentUserProfile?.is_admin === true;
+  const isCurrentUserAdmin = currentUserProfile?.is_admin === true;
 
-  // Load project members with user info
+  // Load project members with user info including organization_id
   const { data: rawMembers } = await supabase
     .from("project_members")
-    .select("user_id, role, users(full_name, email)")
+    .select("user_id, role, users(full_name, email, organization_id)")
     .eq("project_id", projectId);
 
   type MemberRow = {
     user_id: string;
-    role: string;
+    role: "ADMIN" | "COORDINATOR" | "REVIEWER" | "OWNER_APPROVER" | "VIEWER";
     full_name: string;
     email: string | null;
+    organization_id: string | null;
   };
 
   const members: MemberRow[] = (rawMembers ?? []).map((m: any) => ({
@@ -56,6 +55,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
     role: m.role,
     full_name: m.users?.full_name ?? "Sin nombre",
     email: m.users?.email ?? null,
+    organization_id: m.users?.organization_id ?? null,
   }));
 
   // Load all org members (for the "add member" dropdown — only users in the same org)
@@ -106,90 +106,33 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
     }
   }
 
+  // Load connected clients for this project
+  const { clients = [] } = await getProjectClientsAction(projectId);
+
   return (
-    <div className="max-w-5xl mx-auto py-8 px-6 space-y-10">
-      {/* Project Info Settings Form */}
-      <section>
-        <h2 className="text-lg font-semibold mb-6">Información del Proyecto</h2>
-        <SettingsForm project={project} />
-      </section>
+    <div className="max-w-5xl mx-auto py-8 px-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold font-sans text-zinc-900 dark:text-zinc-50">
+          Configuración del Proyecto
+        </h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+          Configura y personaliza los detalles, nomenclatura, accesos de clientes, miembros de equipo y flujos de revisión de tu proyecto.
+        </p>
+      </div>
 
-      <Separator />
-
-      {/* Team Management */}
-      <section>
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold font-sans text-zinc-900 dark:text-zinc-50">
-            Equipo del Proyecto
-          </h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Gestiona quién tiene acceso al proyecto y qué puede hacer cada miembro.
-          </p>
-        </div>
-        <ProjectTeamPanel
-          projectId={projectId}
-          currentUserId={authUser.id}
-          isCurrentUserAdmin={isCurrentUserAdmin}
-          members={members as any}
-          orgMembers={orgMembers}
-        />
-      </section>
-
-      <Separator />
-
-      {/* Review Flow Editor */}
-      <section>
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold font-sans text-zinc-900 dark:text-zinc-50">
-            Flujos de Revisión y Aprobación
-          </h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-            Configura reglas personalizadas para aplicar diferentes flujos de aprobación según los metadatos del documento.
-          </p>
-        </div>
-        <FlowConfigManager
-          projectId={projectId}
-          customProperties={customProperties}
-          reviewers={flowReviewers}
-          initialFlows={existingFlows}
-        />
-      </section>
-
-      <Separator />
-
-      {/* Dynamic Properties (read-only for now) */}
-      <section>
-        <h2 className="text-lg font-semibold mb-4 font-sans text-zinc-900 dark:text-zinc-50">
-          Propiedades Dinámicas (Campos JSONB)
-        </h2>
-        <div className="space-y-4">
-          {customProperties.map((prop) => (
-            <div
-              key={prop.key}
-              className="rounded-lg border border-border p-4 space-y-2 bg-zinc-50/50 dark:bg-zinc-900/30"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">{prop.label}</span>
-                <Badge variant="secondary" className="text-xs">
-                  {prop.type}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground font-mono">
-                key: {prop.key}
-              </p>
-              {prop.options && prop.options.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-1">
-                  {prop.options.map((opt) => (
-                    <Badge key={opt} variant="outline" className="text-xs bg-white dark:bg-zinc-950">
-                      {opt}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
+      <SettingsTabsClient
+        projectId={projectId}
+        project={project}
+        currentUserId={authUser.id}
+        currentUserOrgId={currentUserProfile?.organization_id || null}
+        isCurrentUserAdmin={isCurrentUserAdmin}
+        members={members}
+        orgMembers={orgMembers}
+        clients={clients}
+        customProperties={customProperties}
+        flowReviewers={flowReviewers}
+        existingFlows={existingFlows}
+      />
     </div>
   );
 }

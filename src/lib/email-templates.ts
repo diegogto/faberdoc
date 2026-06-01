@@ -587,3 +587,83 @@ export function getDocumentApprovedEmailHtml(
     logoUrl,
   });
 }
+
+/**
+ * 9. Correo de invitación y vinculación de organización cliente externa
+ */
+export function getClientConnectionEmailHtml(
+  projectName: string,
+  senderOrgName: string,
+  connectionLink: string,
+  isTemporary: boolean,
+  logoUrl?: string | null
+): string {
+  const title = isTemporary
+    ? `Invitación a colaborar en el proyecto ${projectName}`
+    : `Solicitud de vinculación para el proyecto ${projectName}`;
+
+  const headerText = isTemporary
+    ? `Registra tu organización y accede al proyecto`
+    : `Solicitud de Vinculación de Proyecto`;
+
+  const bodyText = isTemporary
+    ? `Has sido invitado por la organización <strong>${senderOrgName}</strong> a participar en el proyecto <strong>${projectName}</strong> en Faberdoc.`
+    : `La organización <strong>${senderOrgName}</strong> ha solicitado conectar su proyecto <strong>${projectName}</strong> con tu organización para realizar envíos de documentos.`;
+
+  const instructionText = isTemporary
+    ? `Para reclamar este proyecto, ver la documentación y colaborar, haz clic en el botón de abajo para registrar tu organización en Faberdoc. Al registrarte con tu dominio de correo, tendrás acceso inmediato.`
+    : `Haz clic en el botón de abajo para revisar y aprobar la vinculación de tu organización al proyecto.`;
+
+  const valuePropsHtml = `
+    <div style="background-color: #fafbfc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin: 28px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; font-weight: 700; display: block; margin-bottom: 12px; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px;">
+        Beneficios de usar Faberdoc para este proyecto:
+      </span>
+      <ul style="margin: 0; padding-left: 20px; color: #475569; font-size: 13px;">
+        <li style="margin-bottom: 8px;">
+          <strong>Plan de Envíos en vivo:</strong> Visualiza y controla la planificación de entregas del proyecto en tiempo real.
+        </li>
+        <li style="margin-bottom: 8px;">
+          <strong>Última versión a un clic:</strong> Accede de forma directa a la versión vigente de todos los documentos y planos, eliminando el riesgo de usar versiones obsoletas.
+        </li>
+        <li>
+          <strong>Trazabilidad inmutable:</strong> Registro histórico detallado de todos los envíos (transmittals) y recepciones de documentos para evitar malentendidos.
+        </li>
+      </ul>
+    </div>
+  `;
+
+  const contentHtml = `
+    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #2e3e56; letter-spacing: -0.01em;">
+      ${headerText}
+    </h2>
+    <p style="margin: 0 0 16px 0; color: #475569;">Hola,</p>
+    <p style="margin: 0 0 16px 0; color: #475569;">
+      ${bodyText}
+    </p>
+    <p style="margin: 0 0 24px 0; color: #475569;">
+      ${instructionText}
+    </p>
+    
+    ${isTemporary ? valuePropsHtml : ""}
+
+    <!-- Botón de Acción -->
+    <div style="margin: 28px 0; text-align: center;">
+      <a href="${connectionLink}" style="display: inline-block; background-color: #2e3e56; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+        ${isTemporary ? "Registrar Organización" : "Aprobar Vinculación"}
+      </a>
+    </div>
+
+    <p style="margin: 24px 0 0 0; font-size: 11px; color: #94a3b8; word-break: break-all;">
+      Enlace directo:<br />
+      <a href="${connectionLink}" style="color: #3e689a; text-decoration: underline;">${connectionLink}</a>
+    </p>
+  `;
+
+  return getBaseEmailLayout({
+    title,
+    previewText: `Invitación al proyecto ${projectName} en Faberdoc.`,
+    contentHtml,
+    logoUrl,
+  });
+}

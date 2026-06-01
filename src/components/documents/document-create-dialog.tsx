@@ -63,7 +63,9 @@ export function DocumentCreateDialog({
       
       const initialProps: Record<string, string> = {};
       customPropertiesDef.forEach((prop) => {
-        initialProps[prop.key] = prop.type === "select" ? prop.options?.[0] || "" : "";
+        const firstOpt = prop.options?.[0];
+        const valStr = typeof firstOpt === "string" ? firstOpt : firstOpt?.value || "";
+        initialProps[prop.key] = prop.type === "select" ? valStr : "";
       });
       setCustomProps(initialProps);
     }
@@ -77,10 +79,27 @@ export function DocumentCreateDialog({
     const projPrefix = projectName.substring(0, 4).toUpperCase();
     code = code.replace("{PROY}", projPrefix);
 
+    // Helper to get code for an attribute value
+    const getAttrCode = (key: string, value: any) => {
+      const valStr = String(value || "").trim();
+      if (!valStr) return "";
+      const def = customPropertiesDef.find((p: any) => p.key.toLowerCase() === key.toLowerCase());
+      if (def?.type === "select" && def.options) {
+        const opt = def.options.find((o: any) => 
+          (typeof o === "string" && o === valStr) || 
+          (typeof o === "object" && o !== null && o.value === valStr)
+        );
+        if (opt && typeof opt === "object" && opt.code) {
+          return opt.code.toUpperCase();
+        }
+      }
+      return valStr.toUpperCase();
+    };
+
     // {ESP}
-    const specialty = String(customProps.specialty || customProps.especialidad || "GEN").trim().toUpperCase();
-    const espPrefix = specialty.substring(0, 3) || "GEN";
-    code = code.replace("{ESP}", espPrefix);
+    const specialtyVal = customProps.specialty || customProps.especialidad || "GEN";
+    const specialtyCode = getAttrCode("especialidad", specialtyVal) || getAttrCode("specialty", specialtyVal) || "GEN";
+    code = code.replace("{ESP}", specialtyCode);
 
     // {NUM}
     const numStr = String(currentCount + 1).padStart(3, "0");
@@ -90,7 +109,8 @@ export function DocumentCreateDialog({
     Object.entries(customProps).forEach(([key, val]) => {
       const placeholder = `{${key.toUpperCase()}}`;
       if (code.includes(placeholder)) {
-        code = code.replace(placeholder, String(val).toUpperCase() || "—");
+        const codeVal = getAttrCode(key, val);
+        code = code.replace(placeholder, codeVal || "—");
       }
     });
 
@@ -188,11 +208,15 @@ export function DocumentCreateDialog({
                     <SelectValue placeholder={`Seleccionar ${prop.label}`} />
                   </SelectTrigger>
                   <SelectContent>
-                    {prop.options?.map((opt) => (
-                      <SelectItem key={opt} value={opt}>
-                        {opt}
-                      </SelectItem>
-                    ))}
+                    {prop.options?.map((opt, idx) => {
+                      const valStr = typeof opt === "string" ? opt : opt.value;
+                      const displayStr = typeof opt === "string" ? opt : `${opt.value} (${opt.code})`;
+                      return (
+                        <SelectItem key={idx} value={valStr}>
+                          {displayStr}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               ) : (

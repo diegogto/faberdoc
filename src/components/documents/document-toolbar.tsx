@@ -102,11 +102,15 @@ export function DocumentToolbar({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">Todas ({prop.label})</SelectItem>
-                  {prop.options?.map((opt) => (
-                    <SelectItem key={opt} value={opt}>
-                      {opt}
-                    </SelectItem>
-                  ))}
+                  {prop.options?.map((opt, idx) => {
+                    const valStr = typeof opt === "string" ? opt : opt.value;
+                    const displayStr = typeof opt === "string" ? opt : `${opt.value} (${opt.code})`;
+                    return (
+                      <SelectItem key={idx} value={valStr}>
+                        {displayStr}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             );

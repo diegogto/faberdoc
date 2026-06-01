@@ -58,7 +58,7 @@ export default async function DashboardLayout({
         name,
         organization_id,
         deleted_at,
-        organizations ( id, name )
+        organizations:organizations!projects_organization_id_fkey ( id, name )
       )
     `
     )

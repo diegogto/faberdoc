@@ -61,8 +61,25 @@ CREATE TABLE IF NOT EXISTS projects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     organization_id UUID REFERENCES organizations(id),
     name VARCHAR(255) NOT NULL,
+    description TEXT,
+    location VARCHAR(255),
+    location_details JSONB,
+    client_name VARCHAR(255),
     naming_pattern VARCHAR(255) NOT NULL,
     versioning_logic VARCHAR(50) DEFAULT 'MIXED' CHECK (versioning_logic IN ('MIXED', 'SEPARATE_EMISSION')),
+    versioning_format_config JSONB DEFAULT '{
+      "version_format": {
+        "type": "numeric",
+        "padding": 2,
+        "starting_value": 0
+      },
+      "emission_types": [
+        {"name": "Para Revisi\u00f3n", "code": "B"},
+        {"name": "Aprobado para Construcci\u00f3n", "code": "IFC"},
+        {"name": "As Built", "code": "ASB"}
+      ],
+      "emission_pattern": "{CODE} - Rev {REV}"
+    }'::JSONB,
     review_flow_config JSONB DEFAULT '{}'::JSONB,
     custom_properties_definition JSONB NOT NULL DEFAULT '[]'::JSONB,
     client_info JSONB,
@@ -76,6 +93,17 @@ CREATE TABLE IF NOT EXISTS project_members (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     role VARCHAR(50) NOT NULL CHECK (role IN ('ADMIN', 'COORDINATOR', 'REVIEWER', 'OWNER_APPROVER', 'VIEWER')),
     PRIMARY KEY (project_id, user_id)
+);
+
+-- Vinculación segura de organizaciones receptoras/clientes a proyectos
+CREATE TABLE IF NOT EXISTS project_connections (
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')) DEFAULT 'PENDING',
+    contact_email VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (project_id, organization_id)
 );
 
 -- ── 4. DOCUMENTOS, REVISIONES Y ARCHIVOS ────────────────────
@@ -188,6 +216,7 @@ ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscription_expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_connections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE revisions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
@@ -197,6 +226,37 @@ ALTER TABLE transmittal_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE join_requests ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view connections for their projects"
+    ON project_connections FOR SELECT
+    USING (
+        project_id IN (
+            SELECT pm.project_id FROM project_members pm WHERE pm.user_id = auth.uid()
+        )
+        OR
+        organization_id = (SELECT organization_id FROM users WHERE id = auth.uid())
+    );
+
+CREATE POLICY "Project admins can insert connections"
+    ON project_connections FOR INSERT
+    WITH CHECK (
+        public.is_project_admin(auth.uid(), project_id) = TRUE
+    );
+
+CREATE POLICY "Project admins can delete connections"
+    ON project_connections FOR DELETE
+    USING (
+        public.is_project_admin(auth.uid(), project_id) = TRUE
+    );
+
+CREATE POLICY "Client admins can update connection status"
+    ON project_connections FOR UPDATE
+    USING (
+        public.is_user_admin(auth.uid(), organization_id) = TRUE
+    )
+    WITH CHECK (
+        public.is_user_admin(auth.uid(), organization_id) = TRUE
+    );
 
 -- ── Políticas: Usuarios ven datos de sus proyectos ──────────
 
@@ -215,6 +275,15 @@ CREATE POLICY "Users can view their own organization"
         )
     );
 
+CREATE POLICY "Admins can update their own organization"
+    ON organizations FOR UPDATE
+    USING (
+        public.is_user_admin(auth.uid(), id) = TRUE
+    )
+    WITH CHECK (
+        public.is_user_admin(auth.uid(), id) = TRUE
+    );
+
 -- Función auxiliar segura para obtener la organización del usuario sin causar recursión
 CREATE OR REPLACE FUNCTION public.get_user_org(user_uuid UUID)
 RETURNS UUID
@@ -225,12 +294,17 @@ AS $$
     SELECT organization_id FROM public.users WHERE id = user_uuid;
 $$;
 
--- Users: Usuarios ven miembros de su organización
-CREATE POLICY "Users can view members of their organization"
+-- Users: Usuarios ven miembros de su organización y solicitantes de acceso
+CREATE POLICY "Users can view members of their organization or join requesters"
     ON users FOR SELECT
     USING (
         id = auth.uid()
         OR organization_id = public.get_user_org(auth.uid())
+        OR EXISTS (
+            SELECT 1 FROM public.join_requests jr
+            WHERE jr.user_id = users.id
+              AND jr.organization_id = public.get_user_org(auth.uid())
+        )
     );
 
 -- Users: Pueden actualizar su propio perfil
@@ -271,6 +345,23 @@ CREATE POLICY "Admins can insert projects"
         public.is_user_admin(auth.uid(), organization_id) = TRUE
     );
 
+CREATE POLICY "Admins and Coordinators can update their projects"
+    ON projects FOR UPDATE
+    USING (
+        public.is_user_admin(auth.uid(), organization_id) = TRUE
+        OR id IN (
+            SELECT project_id FROM public.project_members
+            WHERE user_id = auth.uid() AND role IN ('ADMIN', 'COORDINATOR')
+        )
+    )
+    WITH CHECK (
+        public.is_user_admin(auth.uid(), organization_id) = TRUE
+        OR id IN (
+            SELECT project_id FROM public.project_members
+            WHERE user_id = auth.uid() AND role IN ('ADMIN', 'COORDINATOR')
+        )
+    );
+
 -- Función auxiliar de seguridad para romper la recursión infinita en RLS
 CREATE OR REPLACE FUNCTION public.get_user_projects(user_uuid UUID)
 RETURNS TABLE(project_id UUID)
@@ -308,6 +399,39 @@ CREATE POLICY "Admins can insert members"
     ON project_members FOR INSERT
     WITH CHECK (
         public.is_project_admin(auth.uid(), project_id) = TRUE
+    );
+
+CREATE POLICY "Admins and coordinators can update project members"
+    ON project_members FOR UPDATE
+    USING (
+        public.is_project_admin(auth.uid(), project_id) = TRUE
+        OR EXISTS (
+            SELECT 1 FROM public.project_members caller_pm
+            WHERE caller_pm.project_id = project_members.project_id
+              AND caller_pm.user_id = auth.uid()
+              AND caller_pm.role IN ('ADMIN', 'COORDINATOR')
+        )
+    )
+    WITH CHECK (
+        public.is_project_admin(auth.uid(), project_id) = TRUE
+        OR EXISTS (
+            SELECT 1 FROM public.project_members caller_pm
+            WHERE caller_pm.project_id = project_members.project_id
+              AND caller_pm.user_id = auth.uid()
+              AND caller_pm.role IN ('ADMIN', 'COORDINATOR')
+        )
+    );
+
+CREATE POLICY "Admins and coordinators can delete project members"
+    ON project_members FOR DELETE
+    USING (
+        public.is_project_admin(auth.uid(), project_id) = TRUE
+        OR EXISTS (
+            SELECT 1 FROM public.project_members caller_pm
+            WHERE caller_pm.project_id = project_members.project_id
+              AND caller_pm.user_id = auth.uid()
+              AND caller_pm.role IN ('ADMIN', 'COORDINATOR')
+        )
     );
 
 -- Documents: Usuarios ven documentos de sus proyectos

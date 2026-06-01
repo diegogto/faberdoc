@@ -71,7 +71,7 @@ export interface CustomPropertyDefinition {
   key: string;
   label: string;
   type: "text" | "select" | "number";
-  options?: string[];
+  options?: Array<{ value: string; code: string } | string>;
 }
 
 export interface Project {

@@ -292,3 +292,73 @@ export async function cancelJoinRequestAction(requestId: string) {
   }
 }
 
+/**
+ * Permite a un usuario reclamar una organización temporal (creada por invitación)
+ * si ésta no tiene miembros activos aún.
+ */
+export async function claimOrgAction(orgId: string) {
+  const userSupabase = await createClient();
+  const { data: { user: authUser } } = await userSupabase.auth.getUser();
+  if (!authUser) return { error: "No estás autenticado." };
+
+  const adminSupabase = createAdminClient();
+
+  try {
+    // 1. Validar que la organización tenga 0 usuarios asociados
+    const { count, error: countError } = await adminSupabase
+      .from("users")
+      .select("id", { count: "exact", head: true })
+      .eq("organization_id", orgId);
+
+    if (countError) {
+      return { error: "Error al validar la organización." };
+    }
+
+    if (count && count > 0) {
+      return { error: "Esta organización ya tiene miembros activos. Solicita acceso." };
+    }
+
+    // 2. Asociar al usuario a la organización como Administrador
+    const { error: userError } = await adminSupabase
+      .from("users")
+      .update({
+        organization_id: orgId,
+        is_admin: true,
+      })
+      .eq("id", authUser.id);
+
+    if (userError) {
+      return { error: "No se pudo asociar tu usuario a la organización." };
+    }
+
+    // 3. Asegurar que posea una suscripción gratuita
+    const { data: existingSub } = await adminSupabase
+      .from("subscriptions")
+      .select("id")
+      .eq("organization_id", orgId)
+      .maybeSingle();
+
+    if (!existingSub) {
+      const oneYearFromNow = new Date();
+      oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+
+      await adminSupabase
+        .from("subscriptions")
+        .insert({
+          organization_id: orgId,
+          plan_name: "FREE",
+          status: "ACTIVE",
+          storage_limit_mb: 500,
+          projects_limit: 3,
+          current_period_end: oneYearFromNow.toISOString(),
+        });
+    }
+
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err) {
+    console.error("Excepción en claimOrgAction:", err);
+    return { error: "Ocurrió un error inesperado al reclamar la organización." };
+  }
+}
+

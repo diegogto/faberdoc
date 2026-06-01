@@ -1,10 +1,12 @@
 "use server";
 
 import { createClient, getRequestOrigin } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { sendEmail } from "@/lib/email";
 import { getProjectInviteEmailHtml } from "@/lib/email-templates";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 const createProjectSchema = z.object({
   name: z
@@ -134,27 +136,104 @@ export async function updateProjectSettingsAction(projectId: string, formData: F
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
   if (authError || !authUser) return { error: "No autenticado." };
 
-  const name = formData.get("name") as string;
-  const versioning_logic = formData.get("versioning_logic") as string;
-  const review_flow_type = formData.get("review_flow_type") as string;
-  const naming_pattern = formData.get("naming_pattern") as string;
-
-  if (!name || !name.trim()) {
-    return { error: "El nombre del proyecto es requerido." };
-  }
+  const mode = formData.get("mode") as string; // 'general' | 'naming' or null
 
   try {
+    // Security check: must be Org Admin OR Project Coordinator
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin")
+      .eq("id", authUser.id)
+      .single();
+
+    const { data: projectMember } = await supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", authUser.id)
+      .single();
+
+    const isOrgAdmin = userProfile?.is_admin === true;
+    const isProjectCoordinator = projectMember?.role === "COORDINATOR" || projectMember?.role === "ADMIN";
+
+    if (!isOrgAdmin && !isProjectCoordinator) {
+      return { error: "No tienes permisos para modificar la configuración de este proyecto. Debes ser Administrador de la Organización o Coordinador del Proyecto." };
+    }
+
+    const updateData: any = {};
+
+    if (!mode || mode === "general") {
+      const name = formData.get("name") as string;
+      if (name !== null) {
+        if (!name.trim()) {
+          return { error: "El nombre del proyecto es requerido." };
+        }
+        updateData.name = name.trim();
+      }
+
+      if (formData.has("description")) {
+        const description = formData.get("description") as string;
+        updateData.description = description ? sanitizeHtml(description) : null;
+      }
+
+      if (formData.has("location")) {
+        const location = formData.get("location") as string;
+        updateData.location = location ? location.trim() : null;
+      }
+
+      if (formData.has("location_details")) {
+        const location_details_str = formData.get("location_details") as string;
+        try {
+          updateData.location_details = JSON.parse(location_details_str);
+        } catch (e) {
+          console.error("Error parsing location_details:", e);
+        }
+      }
+
+      if (formData.has("client_name")) {
+        const client_name = formData.get("client_name") as string;
+        updateData.client_name = client_name ? client_name.trim() : null;
+      }
+    }
+
+    if (!mode || mode === "naming") {
+      if (formData.has("naming_pattern")) {
+        const naming_pattern = formData.get("naming_pattern") as string;
+        updateData.naming_pattern = naming_pattern.trim();
+      }
+
+      if (formData.has("versioning_logic")) {
+        updateData.versioning_logic = formData.get("versioning_logic") as string;
+      }
+
+      if (formData.has("versioning_format_config")) {
+        const versioning_format_config_str = formData.get("versioning_format_config") as string;
+        try {
+          updateData.versioning_format_config = JSON.parse(versioning_format_config_str);
+        } catch (e) {
+          console.error("Error parsing versioning_format_config:", e);
+        }
+      }
+
+      if (formData.has("review_flow_type")) {
+        const review_flow_type = formData.get("review_flow_type") as string;
+        const { data: existingProject } = await supabase
+          .from("projects")
+          .select("review_flow_config")
+          .eq("id", projectId)
+          .single();
+        const currentReviewFlowConfig = (existingProject?.review_flow_config as any) || {};
+        updateData.review_flow_config = {
+          ...currentReviewFlowConfig,
+          review_type: review_flow_type || currentReviewFlowConfig.review_type || "PARALLEL",
+        };
+      }
+    }
+
+    // Ejecutar actualización
     const { error } = await supabase
       .from("projects")
-      .update({
-        name: name.trim(),
-        versioning_logic,
-        naming_pattern: naming_pattern.trim(),
-        review_flow_config: {
-          review_type: review_flow_type,
-          reviewers: [],
-        }
-      } as any)
+      .update(updateData)
       .eq("id", projectId);
 
     if (error) {
@@ -178,6 +257,8 @@ export async function assignProjectMemberAction(
   role: "ADMIN" | "COORDINATOR" | "REVIEWER" | "OWNER_APPROVER" | "VIEWER"
 ) {
   const supabase = await createClient();
+  // adminClient bypasea RLS para mutaciones privilegiadas validadas en servidor
+  const adminSupabase = createAdminClient();
 
   // 1. Verificar autenticación
   const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
@@ -201,8 +282,9 @@ export async function assignProjectMemberAction(
       .eq("user_id", authUser.id)
       .single();
 
-    if (!userProfile.is_admin && callerMember?.role !== "ADMIN") {
-      return { error: "No tienes permisos para administrar miembros en este proyecto." };
+    const isProjectCoordinator = callerMember?.role === "COORDINATOR" || callerMember?.role === "ADMIN";
+    if (!userProfile.is_admin && !isProjectCoordinator) {
+      return { error: "No tienes permisos para administrar miembros en este proyecto. Debes ser Administrador de la Organización o Coordinador del Proyecto." };
     }
 
     // 4. Verificar que el usuario objetivo pertenezca a la misma organización
@@ -216,8 +298,9 @@ export async function assignProjectMemberAction(
       return { error: "El usuario debe pertenecer a tu organización." };
     }
 
-    // 5. Insertar/actualizar la membresía
-    const { error: memberError } = await supabase
+    // 5. Insertar/actualizar la membresía (admin bypasea RLS; la autorización
+    //    ya fue validada en los pasos anteriores del servidor)
+    const { error: memberError } = await adminSupabase
       .from("project_members")
       .upsert({
         project_id: projectId,
@@ -269,8 +352,55 @@ export async function assignProjectMemberAction(
     revalidatePath(`/projects/${projectId}/settings`);
     return { success: true };
   } catch (err) {
-    console.error("Excepción al asignar miembro del proyecto:", err);
-    return { error: "Ocurrió un error inesperado al asignar el miembro." };
+    console.error("Excepción en asignación de membresía:", err);
+    return { error: "Error inesperado." };
+  }
+}
+
+export async function updateProjectAttributesAction(projectId: string, attributes: any[]) {
+  const supabase = await createClient();
+
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No autenticado." };
+
+  try {
+    // Validate authorization: Org Admin or Project Coordinator
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin")
+      .eq("id", authUser.id)
+      .single();
+
+    const { data: projectMember } = await supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", authUser.id)
+      .single();
+
+    const isOrgAdmin = userProfile?.is_admin === true;
+    const isProjectCoordinator = projectMember?.role === "COORDINATOR" || projectMember?.role === "ADMIN";
+
+    if (!isOrgAdmin && !isProjectCoordinator) {
+      return { error: "No tienes permisos para modificar los atributos de este proyecto. Debes ser Administrador de la Organización o Coordinador del Proyecto." };
+    }
+
+    const { error } = await supabase
+      .from("projects")
+      .update({
+        custom_properties_definition: attributes
+      } as any)
+      .eq("id", projectId);
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    revalidatePath(`/projects/${projectId}/settings`);
+    return { success: true };
+  } catch (err) {
+    console.error("Error updating project attributes:", err);
+    return { error: "Ocurrió un error inesperado al actualizar los atributos." };
   }
 }
 
@@ -306,11 +436,14 @@ export async function removeProjectMemberAction(projectId: string, targetUserId:
       .eq("user_id", authUser.id)
       .single();
 
-    if (!userProfile.is_admin && callerMember?.role !== "ADMIN") {
-      return { error: "No tienes permisos para remover miembros de este proyecto." };
+    const isProjectCoordinator = callerMember?.role === "COORDINATOR" || callerMember?.role === "ADMIN";
+    if (!userProfile.is_admin && !isProjectCoordinator) {
+      return { error: "No tienes permisos para remover miembros de este proyecto. Debes ser Administrador de la Organización o Coordinador del Proyecto." };
     }
 
-    const { error: deleteError } = await supabase
+    // adminClient bypasea RLS para DELETE privilegiado validado en servidor
+    const adminSupabase = createAdminClient();
+    const { error: deleteError } = await adminSupabase
       .from("project_members")
       .delete()
       .eq("project_id", projectId)

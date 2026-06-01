@@ -24,6 +24,7 @@ function generateDocumentCode(
   pattern: string,
   projectName: string,
   customProps: Record<string, any>,
+  customPropertiesDefs: any[],
   sequence: number
 ): string {
   let code = pattern;
@@ -32,10 +33,27 @@ function generateDocumentCode(
   const projPrefix = projectName.substring(0, 4).toUpperCase();
   code = code.replace("{PROY}", projPrefix);
 
+  // Helper to get code for an attribute value
+  const getAttrCode = (key: string, value: any) => {
+    const valStr = String(value || "").trim();
+    if (!valStr) return "";
+    const def = customPropertiesDefs?.find((p: any) => p.key.toLowerCase() === key.toLowerCase());
+    if (def?.type === "select" && def.options) {
+      const opt = def.options.find((o: any) => 
+        (typeof o === "string" && o === valStr) || 
+        (typeof o === "object" && o !== null && o.value === valStr)
+      );
+      if (opt && typeof opt === "object" && opt.code) {
+        return opt.code.toUpperCase();
+      }
+    }
+    return valStr.toUpperCase();
+  };
+
   // Reemplazar {ESP}
-  const specialty = String(customProps.specialty || customProps.especialidad || "GEN").trim().toUpperCase();
-  const espPrefix = specialty.substring(0, 3);
-  code = code.replace("{ESP}", espPrefix);
+  const specialtyVal = customProps.specialty || customProps.especialidad || "GEN";
+  const specialtyCode = getAttrCode("especialidad", specialtyVal) || getAttrCode("specialty", specialtyVal) || "GEN";
+  code = code.replace("{ESP}", specialtyCode);
 
   // Reemplazar {NUM}
   const numStr = String(sequence).padStart(3, "0");
@@ -45,7 +63,8 @@ function generateDocumentCode(
   for (const [key, val] of Object.entries(customProps)) {
     const placeholder = `{${key.toUpperCase()}}`;
     if (code.includes(placeholder)) {
-      code = code.replace(placeholder, String(val).toUpperCase());
+      const codeVal = getAttrCode(key, val);
+      code = code.replace(placeholder, codeVal);
     }
   }
 
@@ -106,7 +125,7 @@ export async function createDocumentAction(
     // 1. Obtener detalles del proyecto
     const { data: project, error: projError } = await adminSupabase
       .from("projects")
-      .select("name, naming_pattern")
+      .select("name, naming_pattern, custom_properties_definition")
       .eq("id", projectId)
       .single();
 
@@ -131,6 +150,7 @@ export async function createDocumentAction(
         project.naming_pattern,
         project.name,
         custom_properties,
+        (project.custom_properties_definition as any) || [],
         nextSequence
       );
     }
@@ -224,7 +244,7 @@ export async function bulkImportDocumentsAction(
     // 1. Obtener detalles del proyecto
     const { data: project, error: projError } = await adminSupabase
       .from("projects")
-      .select("name, naming_pattern")
+      .select("name, naming_pattern, custom_properties_definition")
       .eq("id", projectId)
       .single();
 
@@ -252,6 +272,7 @@ export async function bulkImportDocumentsAction(
           project.naming_pattern,
           project.name,
           doc.custom_properties,
+          (project.custom_properties_definition as any) || [],
           currentSequence
         );
       }
