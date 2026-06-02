@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS project_connections (
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
     status VARCHAR(50) NOT NULL CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')) DEFAULT 'PENDING',
+    connection_type VARCHAR(50) NOT NULL CHECK (connection_type IN ('CLIENT', 'SUBCONTRACTOR')) DEFAULT 'CLIENT',
     contact_email VARCHAR(255),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),

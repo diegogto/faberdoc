@@ -357,4 +357,34 @@
   - Ejecutado `npm run build` completándose con éxito absoluto, verificando tipado de TypeScript y empaquetado en Next.js.
 
 
+## [2026-06-01] Sesión 14: Limpieza de Terminología, Soporte de Logotipo en Sidebar y Alineación del Schema Maestro
+**Hora:** 23:45 (Local Time)  
+**Objetivo:** Eliminar las referencias a la "ingeniería" de cara al usuario, traducir "MDL" a "Maestro de Documentos" en todas las vistas de la aplicación, limpiar emojis de los textos de la interfaz, habilitar el logotipo de la organización en la barra lateral con mecanismo de fallback ante fallos de carga, y sincronizar y limpiar los archivos SQL del directorio `supabase/`.
+
+### 1. Cambios en Código (Next.js & UI)
+- **Alineación de Terminología**:
+  - Removidas todas las menciones a proyectos o empresas de "ingeniería" en Onboarding, diálogos de creación, metadatos y datos mock para flexibilizar la plataforma.
+  - Traducidas todas las referencias visibles del acrónimo inglés **MDL (Master Delivery List)** a **Maestro de Documentos** (en la navegación superior de proyectos, tarjetas de proyectos, avisos y descripciones del cajón de detalles).
+- **Limpieza Visual de Emojis**:
+  - Removidos los emojis de saludo (`👋`) en la cabecera y el dado (`🎲`) en el generador de previsualización.
+  - En el importador masivo de documentos, se sustituyó el emoji `📁` por el icono vectorial nativo `<FolderOpen />` de Lucide.
+- **Logotipo de la Organización en el Sidebar**:
+  - Modificado el layout principal `src/app/(dashboard)/layout.tsx` para recuperar la columna `logo_url` de la tabla `organizations`.
+  - Actualizado el componente `Sidebar` y `SidebarSection` para recibir `logoUrl`.
+  - Si la organización tiene un logotipo configurado, se despliega una vista en miniatura a la izquierda de su nombre en lugar del icono predeterminado de edificio (`Building2`).
+  - Se implementó un manejador `onError` en la imagen que oculta el elemento roto y muestra automáticamente el icono `Building2` en caso de fallos de red o URL inválida.
+
+### 2. Cambios en Base de Datos (Supabase)
+- **Alineación de Esquema**:
+  - Comparado el esquema remoto activo de producción con el archivo maestro `schema.sql` usando `pg_dump` y un comparador de sintaxis.
+  - Detectada y añadida la columna `connection_type` (tipo `VARCHAR(50)` con valores permitidos `'CLIENT'` o `'SUBCONTRACTOR'`) a la tabla `project_connections` en [[schema.sql](file:///home/diegogto/Documents/Projects/Faberdoc/supabase/schema.sql)].
+- **Limpieza de Carpeta de Supabase**:
+  - Eliminado el directorio obsoleto de migraciones `supabase/migrations/`, dejando el archivo consolidado `schema.sql` como la única fuente de verdad del diseño de la base de datos ("estado del arte").
+
+### 3. Plan de Control e Integridad
+- **Compilación de Producción**:
+  - Ejecutado `npm run build` con éxito total, verificando la ausencia de errores en TypeScript y el empaquetado de producción de Next.js.
+
+
+
 
