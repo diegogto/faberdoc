@@ -11,7 +11,7 @@ interface TopBarProps {
 
 const TABS = [
   { key: "dashboard", label: "Dashboard", href: "" },
-  { key: "mdl", label: "MDL", href: "/mdl" },
+  { key: "mdl", label: "Maestro de Documentos", href: "/mdl" },
   { key: "transmittals", label: "Envíos", href: "/transmittals" },
   { key: "settings", label: "Configuración", href: "/settings" },
 ] as const;

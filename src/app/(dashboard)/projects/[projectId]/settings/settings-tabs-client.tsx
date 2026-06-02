@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { updateProjectAttributesAction } from "@/app/(dashboard)/projects/actions";
+import { updateProjectAttributesAction, archiveProjectAction, deleteProjectAction } from "@/app/(dashboard)/projects/actions";
 import {
   Building,
   Settings,
@@ -25,7 +25,9 @@ import {
   Edit2,
   X,
   Loader2,
-  Upload
+  Upload,
+  Archive,
+  ShieldAlert
 } from "lucide-react";
 
 interface SettingsTabsClientProps {
@@ -317,10 +319,36 @@ export function SettingsTabsClient({
   };
 
   // Role evaluations
+  const isArchived = !!project.archived_at;
   const currentUserMember = members.find((m) => m.user_id === currentUserId);
   const isProjectCoordinator =
     currentUserMember?.role === "COORDINATOR" || currentUserMember?.role === "ADMIN";
-  const hasEditRights = isCurrentUserAdmin || isProjectCoordinator;
+  const hasEditRights = (isCurrentUserAdmin || isProjectCoordinator) && !isArchived;
+
+  const [isArchivePending, startArchiveTransition] = useTransition();
+  const [isDeletePending, startDeleteTransition] = useTransition();
+
+  const handleArchiveProject = () => {
+    startArchiveTransition(async () => {
+      const res = await archiveProjectAction(projectId);
+      if (res.error) {
+        alert(res.error);
+      } else {
+        router.refresh();
+      }
+    });
+  };
+
+  const handleDeleteProject = () => {
+    startDeleteTransition(async () => {
+      const res = await deleteProjectAction(projectId);
+      if (res.error) {
+        alert(res.error);
+      } else {
+        router.push("/"); // Redirect to dashboard home
+      }
+    });
+  };
 
   useEffect(() => {
     const tab = searchParams.get("tab");
@@ -469,7 +497,7 @@ export function SettingsTabsClient({
   };
 
   const handleDeleteAttribute = (key: string) => {
-    if (!confirm("¿Estás seguro de que deseas eliminar este atributo del proyecto? Se perderán las referencias guardadas en los planos del MDL.")) {
+    if (!confirm("¿Estás seguro de que deseas eliminar este atributo del proyecto? Se perderán las referencias guardadas en los planos del Maestro de Documentos.")) {
       return;
     }
 
@@ -516,6 +544,18 @@ export function SettingsTabsClient({
 
   return (
     <div className="space-y-6">
+      {isArchived && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-xl p-4 flex items-start gap-3 text-amber-800 dark:text-amber-300">
+          <Archive className="h-5 w-5 shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-semibold">Este proyecto está archivado</h3>
+            <p className="text-xs mt-1 text-amber-700/90 dark:text-amber-400/90">
+              El proyecto se encuentra en modo de solo lectura. No se pueden modificar documentos, miembros ni configuraciones.
+            </p>
+          </div>
+        </div>
+      )}
+
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="w-full justify-start border-b border-border bg-transparent p-0 rounded-none mb-6 gap-2">
           <TabsTrigger value="general" className="px-4 py-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent">
@@ -558,6 +598,141 @@ export function SettingsTabsClient({
                 />
               </div>
               <SettingsForm project={project} mode="general" />
+            </div>
+
+            {/* Danger Zone */}
+            <div className="bg-white dark:bg-zinc-950 border border-red-200 dark:border-red-900/30 rounded-xl p-6 shadow-xs mt-6">
+              <div className="flex items-center gap-2 mb-4">
+                <ShieldAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
+                <h2 className="text-base font-bold text-red-600 dark:text-red-500 font-sans">Zona de Peligro</h2>
+              </div>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-6">
+                Acciones críticas del ciclo de vida del proyecto. Asegúrate de leer las consecuencias antes de proceder.
+              </p>
+
+              <div className="space-y-6 divide-y divide-zinc-100 dark:divide-zinc-800/40">
+                {/* Archiving Row */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-4 first:pt-0">
+                  <div className="space-y-1 max-w-xl">
+                    <h3 className="text-sm font-semibold text-zinc-950 dark:text-zinc-50 flex items-center gap-1.5 font-sans">
+                      <Archive className="h-4 w-4 text-zinc-500" />
+                      Archivar Proyecto
+                    </h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Pone el proyecto en modo solo lectura de manera permanente. No se podrán modificar documentos, comentarios ni flujos. Los usuarios regulares solo podrán descargar la versión más reciente de cada plano; las revisiones intermedias se archivarán y solo serán accesibles para administradores y coordinadores.
+                    </p>
+                  </div>
+                  <div>
+                    {isArchived ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/30 px-2.5 py-1 rounded-full">
+                        <Archive className="h-3 w-3" />
+                        Archivado
+                      </span>
+                    ) : (
+                      <Dialog>
+                      <DialogTrigger render={
+                        <Button variant="outline" className="border-amber-200 hover:bg-amber-50 hover:text-amber-800 text-amber-700 dark:border-amber-900/40 dark:hover:bg-amber-950/30 dark:text-amber-400 cursor-pointer">
+                          Archivar Proyecto
+                        </Button>
+                      } />
+                      <DialogContent className="sm:max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2 font-sans font-bold">
+                            <Archive className="h-5 w-5 text-amber-600" />
+                            ¿Archivar el proyecto "{project.name}"?
+                          </DialogTitle>
+                          <DialogDescription className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
+                            Esta acción pondrá el proyecto en modo solo lectura de forma permanente.
+                          </DialogDescription>
+                          <div className="text-xs text-zinc-500 dark:text-zinc-400 space-y-1.5 mt-2 bg-zinc-50 dark:bg-zinc-900/50 p-3 rounded-lg border border-zinc-100 dark:border-zinc-900">
+                            <p className="font-semibold text-zinc-800 dark:text-zinc-200">Al archivar el proyecto:</p>
+                            <ul className="list-disc pl-4 space-y-1">
+                              <li>No se podrán subir nuevos planos ni revisiones.</li>
+                              <li>No se podrán crear transmittals ni modificar la configuración.</li>
+                              <li>Los usuarios estándar solo podrán ver y descargar la **última versión** de cada plano.</li>
+                              <li>Los planos intermedios quedarán archivados y solo tú y otros administradores/coordinadores podrán acceder a ellos.</li>
+                            </ul>
+                          </div>
+                        </DialogHeader>
+                        <DialogFooter className="mt-4 gap-2 sm:gap-0">
+                          <DialogTrigger render={
+                            <Button variant="ghost" disabled={isArchivePending} className="cursor-pointer">Cancelar</Button>
+                          } />
+                            <Button 
+                              variant="default" 
+                              className="bg-[#3e689a] hover:bg-[#2e3e56] text-white cursor-pointer"
+                              onClick={handleArchiveProject}
+                              disabled={isArchivePending}
+                            >
+                              {isArchivePending ? "Archivando..." : "Confirmar y Archivar"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </div>
+                </div>
+
+                {/* Deleting Row */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-6">
+                  <div className="space-y-1 max-w-xl">
+                    <h3 className="text-sm font-semibold text-red-600 flex items-center gap-1.5 font-sans">
+                      <Trash2 className="h-4 w-4" />
+                      Eliminar Proyecto
+                    </h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Mueve el proyecto a la Papelera de reciclaje de 30 días. El proyecto se ocultará inmediatamente de la plataforma para todos los usuarios. Podrá ser recuperado antes de que transcurran 30 días, momento en el cual se eliminará de forma física y permanente junto con todos sus planos y archivos.
+                    </p>
+                  </div>
+                  <div>
+                    {!isCurrentUserAdmin ? (
+                      <span className="text-xs text-zinc-400 italic">
+                        Solo para administradores de la organización
+                      </span>
+                    ) : (
+                      <Dialog>
+                      <DialogTrigger render={
+                        <Button variant="destructive" className="bg-red-600 hover:bg-red-700 text-white cursor-pointer">
+                          Eliminar Proyecto
+                        </Button>
+                      } />
+                      <DialogContent className="sm:max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2 text-red-600 font-sans font-bold">
+                            <ShieldAlert className="h-5 w-5" />
+                            ¿Eliminar el proyecto "{project.name}"?
+                          </DialogTitle>
+                          <DialogDescription className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
+                            Esta acción moverá el proyecto a la Papelera de reciclaje por un período de **30 días**.
+                          </DialogDescription>
+                          <div className="text-xs text-zinc-500 dark:text-zinc-400 space-y-1.5 mt-2 bg-red-50/50 dark:bg-red-950/10 p-3 rounded-lg border border-red-100 dark:border-red-950/20">
+                            <p className="font-semibold text-red-800 dark:text-red-400">Importante:</p>
+                            <ul className="list-disc pl-4 space-y-1">
+                              <li>El proyecto se ocultará inmediatamente de todos los listados de la plataforma.</li>
+                              <li>Ningún miembro de la organización ni clientes podrán acceder a los documentos.</li>
+                              <li>Después de 30 días, el proyecto y todos sus planos, transmittals, comentarios y archivos en el storage serán **purgados de forma permanente e irreversible**.</li>
+                            </ul>
+                          </div>
+                        </DialogHeader>
+                        <DialogFooter className="mt-4 gap-2 sm:gap-0">
+                          <DialogTrigger render={
+                            <Button variant="ghost" disabled={isDeletePending} className="cursor-pointer">Cancelar</Button>
+                          } />
+                            <Button 
+                              variant="destructive"
+                              className="bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+                              onClick={handleDeleteProject}
+                              disabled={isDeletePending}
+                            >
+                              {isDeletePending ? "Eliminando..." : "Confirmar y Enviar a Papelera"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </TabsContent>
 
@@ -630,6 +805,12 @@ export function SettingsTabsClient({
                             <p className="text-xs text-zinc-500 dark:text-zinc-400">Sube archivos y gestiona el estado de documentos</p>
                           </div>
                           <div className="flex items-start gap-2">
+                            <Badge variant="outline" className="text-[10px] font-semibold shrink-0 mt-0.5 bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/20 dark:text-teal-400 dark:border-teal-900/30">
+                              Ejecutor
+                            </Badge>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">Sube archivos y crea versiones para su revisión</p>
+                          </div>
+                          <div className="flex items-start gap-2">
                             <Badge variant="outline" className="text-[10px] font-semibold shrink-0 mt-0.5 bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30">
                               Revisor
                             </Badge>
@@ -678,6 +859,7 @@ export function SettingsTabsClient({
                 customProperties={customProperties}
                 reviewers={flowReviewers}
                 initialFlows={existingFlows}
+                hasEditRights={hasEditRights}
               />
             </div>
           </TabsContent>

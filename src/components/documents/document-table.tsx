@@ -29,12 +29,18 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { createClient } from "@/lib/supabase/client";
 import type { DocumentTableRow, DocumentDetail, CustomPropertyDefinition } from "@/lib/types";
 
+type ProjectRole = "ADMIN" | "COORDINATOR" | "REVIEWER" | "OWNER_APPROVER" | "VIEWER" | "UPLOADER";
+
 interface DocumentTableProps {
   data: DocumentTableRow[];
   projectId: string;
   projectName: string;
   customPropertiesDef: CustomPropertyDefinition[];
   namingPattern: string;
+  userRole?: ProjectRole;
+  currentUserId?: string;
+  isProjectArchived?: boolean;
+  canAccessArchivedIntermediate?: boolean;
 }
 
 export function DocumentTable({
@@ -43,6 +49,10 @@ export function DocumentTable({
   projectName,
   customPropertiesDef,
   namingPattern,
+  userRole = "VIEWER",
+  currentUserId,
+  isProjectArchived = false,
+  canAccessArchivedIntermediate = false,
 }: DocumentTableProps) {
   const router = useRouter();
 
@@ -51,6 +61,7 @@ export function DocumentTable({
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [filterTab, setFilterTab] = useState<"all" | "pending">("all");
 
   // Estados de modales
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -62,6 +73,31 @@ export function DocumentTable({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
+  // Filtrar los documentos donde el usuario actual tiene revisión/ejecución pendiente en active_nodes
+  const checkIsPending = (doc: DocumentTableRow) => {
+    if (!currentUserId) return false;
+    const activeNodes = (doc.active_nodes as any[]) || [];
+    return activeNodes.some((node) => {
+      if (node.status !== "PENDING") return false;
+      if (node.type === "reviewer") {
+        return node.data?.userId === currentUserId;
+      }
+      if (node.type === "executor") {
+        return userRole === "COORDINATOR" || userRole === "UPLOADER" || userRole === "ADMIN";
+      }
+      return false;
+    });
+  };
+
+  const pendingCount = useMemo(() => {
+    return data.filter(checkIsPending).length;
+  }, [data, currentUserId, userRole]);
+
+  const filteredData = useMemo(() => {
+    if (filterTab === "all") return data;
+    return data.filter(checkIsPending);
+  }, [data, filterTab, currentUserId, userRole]);
+
   // Generar columnas de forma dinámica
   const columns = useMemo(
     () => generateDocumentColumns(customPropertiesDef),
@@ -69,7 +105,7 @@ export function DocumentTable({
   );
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     state: {
       sorting,
@@ -216,6 +252,11 @@ export function DocumentTable({
         customPropertiesDef={customPropertiesDef}
         onNewDocumentClick={() => setIsCreateOpen(true)}
         onImportCSVClick={() => setIsImportOpen(true)}
+        filterTab={filterTab}
+        onFilterTabChange={setFilterTab}
+        currentUserId={currentUserId}
+        pendingCount={pendingCount}
+        isProjectArchived={isProjectArchived}
       />
 
       {/* Table */}
@@ -269,7 +310,7 @@ export function DocumentTable({
                 >
                   <EmptyState
                     title="Sin documentos registrados"
-                    description="No hay documentos en la MDL para este proyecto o ningún registro coincide con los filtros."
+                    description="No hay documentos en el Maestro de Documentos para este proyecto o ningún registro coincide con los filtros."
                   />
                 </TableCell>
               </TableRow>
@@ -284,12 +325,16 @@ export function DocumentTable({
         isOpen={isDrawerOpen}
         onClose={handleDrawerClose}
         projectId={projectId}
+        userRole={userRole}
+        currentUserId={currentUserId}
         onRefresh={() => {
           if (selectedDocumentDetail) {
             handleRowClick(selectedDocumentDetail.document.id);
           }
           router.refresh();
         }}
+        isProjectArchived={isProjectArchived}
+        canAccessArchivedIntermediate={canAccessArchivedIntermediate}
       />
 
       {/* Modal: Crear Documento */}

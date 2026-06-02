@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { FolderOpen } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -336,8 +337,8 @@ export function DocumentImportDialog({
                 className="hidden"
               />
               <div className="space-y-2">
-                <div className="mx-auto w-10 h-10 rounded-full bg-muted/60 flex items-center justify-center text-muted-foreground text-lg">
-                  📁
+                <div className="mx-auto w-10 h-10 rounded-full bg-muted/60 flex items-center justify-center text-muted-foreground">
+                  <FolderOpen className="h-5 w-5" />
                 </div>
                 <div className="text-sm font-medium">
                   {file ? file.name : "Selecciona o arrastra tu archivo CSV"}

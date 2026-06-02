@@ -21,7 +21,13 @@ export interface ActivityItem {
 }
 
 export interface DashboardData {
-  projects: { id: string; name: string; organization_name: string }[];
+  projects: {
+    id: string;
+    name: string;
+    organization_name: string;
+    doc_count: number;
+    pending_review_count: number;
+  }[];
   pendingReviews: {
     id: string;
     version_label: string;
@@ -89,8 +95,46 @@ export async function getDashboardDataAction(): Promise<{ data?: DashboardData; 
         id: proj.id,
         name: proj.name,
         organization_name: proj.organization?.name || "Organización",
+        doc_count: 0,
+        pending_review_count: 0,
       };
     });
+
+    // 1b. Enrich project cards with document counts
+    if (projectsList.length > 0) {
+      const projectIds = projectsList.map((p) => p.id);
+
+      // Count documents per project (non-deleted)
+      const { data: docCounts } = await supabase
+        .from("documents")
+        .select("project_id")
+        .in("project_id", projectIds)
+        .is("deleted_at", null);
+
+      // Count in_review revisions per project
+      const { data: pendingRevs } = await (supabase as any)
+        .from("revisions")
+        .select("document:documents!inner(project_id)")
+        .in("status", ["IN_REVIEW", "COMMENTED"])
+        .in("documents.project_id", projectIds);
+
+      // Aggregate by project
+      const docCountByProject = (docCounts ?? []).reduce<Record<string, number>>((acc, row) => {
+        acc[row.project_id] = (acc[row.project_id] || 0) + 1;
+        return acc;
+      }, {});
+
+      const pendingCountByProject: Record<string, number> = ((pendingRevs ?? []) as any[]).reduce((acc: Record<string, number>, row: any) => {
+        const projId = Array.isArray(row.document) ? row.document[0]?.project_id : row.document?.project_id;
+        if (projId) acc[projId] = (acc[projId] || 0) + 1;
+        return acc;
+      }, {});
+
+      for (const proj of projectsList) {
+        proj.doc_count = docCountByProject[proj.id] || 0;
+        proj.pending_review_count = pendingCountByProject[proj.id] || 0;
+      }
+    }
 
     // 2. Fetch pending reviews (revisions in 'IN_REVIEW' within user's projects)
     const { data: inReviewRevs } = await supabase

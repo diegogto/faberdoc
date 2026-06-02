@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { sendEmail } from "@/lib/email";
 import { getClientConnectionEmailHtml } from "@/lib/email-templates";
+import { checkIfProjectArchived } from "@/app/(dashboard)/projects/actions";
 
 const connectClientSchema = z.object({
   email: z.string().email("Correo electrónico inválido"),
@@ -96,6 +97,9 @@ export async function connectClientAction(
   }
 
   try {
+    if (await checkIfProjectArchived(projectId, userSupabase)) {
+      return { error: "Este proyecto está archivado y no puede ser modificado." };
+    }
     // 3. Verify user has Organization Admin or Project Coordinator role
     const { data: userProfile } = await userSupabase
       .from("users")
@@ -285,6 +289,9 @@ export async function removeClientConnectionAction(projectId: string, organizati
   if (authError || !authUser) return { error: "No estás autenticado." };
 
   try {
+    if (await checkIfProjectArchived(projectId, userSupabase)) {
+      return { error: "Este proyecto está archivado y no puede ser modificado." };
+    }
     const { data: userProfile } = await userSupabase
       .from("users")
       .select("is_admin")
@@ -339,6 +346,9 @@ export async function addRecipientMemberAction(
   if (authError || !authUser) return { error: "No estás autenticado." };
 
   try {
+    if (await checkIfProjectArchived(projectId, supabase)) {
+      return { error: "Este proyecto está archivado y no puede ser modificado." };
+    }
     // Validate authorization:
     // - Caller is Org Admin of project owner
     // - OR Caller is Project Coordinator of project

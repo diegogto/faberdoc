@@ -6,6 +6,7 @@ import { EmptyProjectsView } from "@/components/layout/empty-projects-view";
 import { GlobalTimeline } from "@/components/layout/global-timeline";
 import { getDashboardDataAction } from "./dashboard-actions";
 import { CreateProjectButton } from "@/components/layout/create-project-button";
+import { TrashcanButton } from "@/components/layout/trashcan-button";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -53,14 +54,19 @@ export default async function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-100 dark:border-zinc-800 pb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50 font-sans">
-            ¡Hola, {userProfile.full_name}! 👋
+            ¡Hola, {userProfile.full_name}!
           </h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1.5">
             Bienvenido al panel de control de Faberdoc. Revisa la actividad reciente y tus tareas pendientes.
           </p>
         </div>
 
-        {userProfile.is_admin && <CreateProjectButton />}
+        {userProfile.is_admin && (
+          <div className="flex items-center gap-2">
+            <TrashcanButton />
+            <CreateProjectButton />
+          </div>
+        )}
       </div>
 
       {/* Projects Grid */}
@@ -89,13 +95,28 @@ export default async function DashboardPage() {
                 </h3>
               </div>
 
-              <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 mt-6 pt-3 border-t border-zinc-50 dark:border-zinc-900">
-                <span>Ver Master Delivery List (MDL)</span>
+              {/* KPI Badges */}
+              <div className="flex items-center gap-2 mt-4">
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                  <FileText className="h-3 w-3" />
+                  {proj.doc_count} doc{proj.doc_count !== 1 ? "s" : ""}
+                </span>
+                {proj.pending_review_count > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 px-2 py-0.5 rounded-full">
+                    <AlertCircle className="h-3 w-3" />
+                    {proj.pending_review_count} pendiente{proj.pending_review_count !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-400 mt-4 pt-3 border-t border-zinc-50 dark:border-zinc-900">
+                <span>Ver Maestro de Documentos</span>
                 <ArrowRight className="h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
               </div>
             </Link>
           ))}
         </div>
+
       </div>
 
       {/* Main Dashboard Layout Split */}

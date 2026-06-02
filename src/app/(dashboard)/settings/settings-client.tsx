@@ -14,11 +14,20 @@ import {
   Loader2,
   Mail,
   UserCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   updateProfileAction,
   updatePasswordAction,
@@ -82,11 +91,53 @@ export function SettingsClient({
 
   const [activeTab, setActiveTab] = useState<"profile" | "org">(activeTabParam);
   const [showInviteForm, setShowInviteForm] = useState(false);
+  // Confirmation dialog for removing org members
+  const [removeConfirmTarget, setRemoveConfirmTarget] = useState<{ userId: string; userName: string } | null>(null);
   
   // Sincronizar estado local con query params
   useEffect(() => {
     setActiveTab(activeTabParam);
   }, [activeTabParam]);
+
+  const [globalNotification, setGlobalNotification] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+    const message = searchParams.get("message");
+
+    if (success === "request_approved") {
+      setGlobalNotification({ type: "success", text: "Solicitud de acceso aprobada correctamente." });
+      setActiveTab("org");
+    } else if (success === "request_rejected") {
+      setGlobalNotification({ type: "success", text: "Solicitud de acceso rechazada." });
+      setActiveTab("org");
+    } else if (error === "unauthorized_admin") {
+      setGlobalNotification({ type: "error", text: "No autorizado. Debes ser administrador de la organización." });
+    } else if (error === "request_not_found") {
+      setGlobalNotification({ type: "error", text: "La solicitud de acceso no fue encontrada." });
+    } else if (error === "update_failed") {
+      setGlobalNotification({ type: "error", text: "No se pudo actualizar el perfil del usuario. Inténtalo de nuevo." });
+    } else if (message === "request_already_processed") {
+      const statusStr = searchParams.get("status") === "APPROVED" ? "aprobada" : "rechazada";
+      setGlobalNotification({ type: "info", text: `Esta solicitud ya fue procesada anteriormente y se encuentra ${statusStr}.` });
+      setActiveTab("org");
+    }
+
+    if (success || error || message) {
+      const params = new URLSearchParams(window.location.search);
+      params.delete("success");
+      params.delete("error");
+      params.delete("message");
+      params.delete("status");
+      params.delete("detail");
+      const newUrl = window.location.pathname + (params.toString() ? `?${params.toString()}` : "");
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, [searchParams]);
 
   const handleTabChange = (tab: "profile" | "org") => {
     setActiveTab(tab);
@@ -255,15 +306,15 @@ export function SettingsClient({
     });
   };
 
-  // Remover usuario
-  const handleRemoveUser = (userId: string, userName: string) => {
-    if (
-      !confirm(
-        `¿Estás seguro de que deseas eliminar a ${userName} de la organización? Se le retirará de todos los proyectos.`
-      )
-    ) {
-      return;
-    }
+  // Remover usuario — solicita confirmación via Dialog
+  const requestRemoveUser = (userId: string, userName: string) => {
+    setRemoveConfirmTarget({ userId, userName });
+  };
+
+  const confirmRemoveUser = () => {
+    if (!removeConfirmTarget) return;
+    const { userId, userName } = removeConfirmTarget;
+    setRemoveConfirmTarget(null);
     setOrgMessage(null);
     startOrgTransition(async () => {
       const res = await removeUserFromOrgAction(userId);
@@ -313,7 +364,8 @@ export function SettingsClient({
   };
 
   return (
-    <div className="container max-w-6xl py-8 px-4 sm:px-6 lg:px-8 space-y-8">
+    <>
+      <div className="container max-w-6xl py-8 px-4 sm:px-6 lg:px-8 space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground">
@@ -349,6 +401,30 @@ export function SettingsClient({
           Mi Organización
         </button>
       </div>
+
+      {/* Global query param notification banner */}
+      {globalNotification && (
+        <div className={`p-4 rounded-xl border flex items-start gap-3 text-sm ${
+          globalNotification.type === "success"
+            ? "bg-green-50/50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/30"
+            : globalNotification.type === "error"
+            ? "bg-red-50/50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/30"
+            : "bg-blue-50/50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/30"
+        }`}>
+          <div className="flex-1">
+            <span className="font-semibold">
+              {globalNotification.type === "success" ? "Operación exitosa: " : globalNotification.type === "error" ? "Error: " : "Información: "}
+            </span>
+            {globalNotification.text}
+          </div>
+          <button
+            onClick={() => setGlobalNotification(null)}
+            className="text-muted-foreground hover:text-foreground cursor-pointer"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* TABS CONTENT */}
       {activeTab === "profile" && (
@@ -762,7 +838,7 @@ export function SettingsClient({
                                   size="icon"
                                   className="h-7 w-7 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 cursor-pointer"
                                   onClick={() =>
-                                    handleRemoveUser(member.id, member.full_name)
+                                    requestRemoveUser(member.id, member.full_name)
                                   }
                                   disabled={orgPending}
                                   title={`Remover a ${member.full_name} de la organización`}
@@ -900,5 +976,47 @@ export function SettingsClient({
         </div>
       )}
     </div>
+
+      {/* ─── Confirm remove org member ───────────────────────────────────────── */}
+      <Dialog open={!!removeConfirmTarget} onOpenChange={(open) => { if (!open) setRemoveConfirmTarget(null); }}>
+        <DialogContent className="sm:max-w-sm rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-zinc-900 dark:text-zinc-50">
+              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+              Remover miembro de la organización
+            </DialogTitle>
+            <DialogDescription className="pt-1">
+              ¿Estás seguro de que deseas eliminar a{" "}
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                {removeConfirmTarget?.userName}
+              </span>{" "}
+              de la organización? Se le retirará de todos los proyectos. Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="cursor-pointer"
+              onClick={() => setRemoveConfirmTarget(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="cursor-pointer gap-1.5"
+              onClick={confirmRemoveUser}
+              disabled={orgPending}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Sí, eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

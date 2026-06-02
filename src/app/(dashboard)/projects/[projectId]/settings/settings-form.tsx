@@ -25,6 +25,7 @@ interface SettingsFormProps {
     location_details?: any;
     client_name?: string | null;
     versioning_format_config?: any;
+    archived_at?: string | null;
   };
   mode: "general" | "naming";
 }
@@ -1585,7 +1586,6 @@ export function SettingsForm({ project, mode }: SettingsFormProps) {
                     onClick={handleGenerateRandomPreview}
                     className="h-7 text-[10px] gap-1 cursor-pointer"
                   >
-                    <span>🎲</span>
                     <span>Probar Aleatorio</span>
                   </Button>
                   {previewOverrides && (
@@ -1656,8 +1656,8 @@ export function SettingsForm({ project, mode }: SettingsFormProps) {
         </div>
       )}
 
-      <Button type="submit" disabled={isPending} className="w-full md:w-auto px-8 cursor-pointer">
-        {isPending ? "Guardando..." : "Guardar Cambios"}
+      <Button type="submit" disabled={isPending || !!project.archived_at} className="w-full md:w-auto px-8 cursor-pointer">
+        {isPending ? "Guardando..." : project.archived_at ? "Proyecto Archivado" : "Guardar Cambios"}
       </Button>
     </form>
   );

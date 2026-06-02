@@ -348,7 +348,7 @@ export function OnboardingClient({
                   Crea tu espacio de trabajo
                 </h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Ingresa el nombre de tu empresa para empezar a controlar tus proyectos de ingeniería.
+                  Ingresa el nombre de tu empresa para empezar a controlar tus proyectos.
                 </p>
               </div>
 

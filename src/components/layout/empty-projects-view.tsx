@@ -27,11 +27,11 @@ export function EmptyProjectsView({ isAdmin, userFullName }: EmptyProjectsViewPr
         {/* Dynamic Title */}
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {isAdmin ? `¡Bienvenido, ${userFullName}! 👋` : "Sin proyectos asignados"}
+            {isAdmin ? `¡Bienvenido, ${userFullName}!` : "Sin proyectos asignados"}
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
             {isAdmin
-              ? "Comienza creando tu primer proyecto de ingeniería en Faberdoc para habilitar la nomenclatura inteligente, el Master Delivery List (MDL) y el control documental."
+              ? "Comienza creando tu primer proyecto en Faberdoc para habilitar la nomenclatura inteligente, el Maestro de Documentos y el control documental."
               : "Actualmente no tienes proyectos asignados en tu cuenta. Por favor, ponte en contacto con el administrador de tu organización para que te asigne a un proyecto activo."}
           </p>
         </div>
@@ -46,7 +46,7 @@ export function EmptyProjectsView({ isAdmin, userFullName }: EmptyProjectsViewPr
 
             <CreateProjectDialogContent
               onClose={() => setIsDialogOpen(false)}
-              description="Ingresa el nombre de tu primer proyecto de ingeniería. Se creará con el formato estandarizado de Faberdoc."
+              description="Ingresa el nombre de tu primer proyecto. Se creará con el formato estandarizado de Faberdoc."
             />
           </Dialog>
         )}

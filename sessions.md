@@ -254,3 +254,107 @@
 ### 3. Plan de Control e Integridad
 - Compilación del proyecto local verificada con éxito (`npm run build` finalizado exitosamente y con 0 errores).
 
+
+## [2026-06-01] Sesión 10: Control de Acceso por Roles, Modo de Solo Lectura en FlowEditor, Confirmaciones Modernizadas y Métricas en Dashboard
+**Hora:** 13:48 (Local Time)  
+**Objetivo:** Implementar restricciones y avisos en base al rol del usuario en la visualización de documentos y configuración de flujos de revisión. Sustituir `window.confirm()` por diálogos interactivos de Shadcn, y enriquecer el panel del dashboard con métricas de documentos y revisiones pendientes.
+
+### 1. Cambios en Código (Next.js & Supabase)
+- **Roles en Cajón de Documentos**:
+  - Modificado [[page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/[projectId]/mdl/page.tsx)], [[document-table.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/document-table.tsx)] y [[document-drawer.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/document-drawer.tsx)] para propagar el rol del usuario (`userRole`) y restringir operaciones de escritura (carga de archivos, iniciar revisión, aprobar, comentar y crear versiones) a usuarios `VIEWER`.
+- **Modo de Solo Lectura en ReactFlow**:
+  - En [[FlowEditor.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/flow-editor/FlowEditor.tsx)] y [[FlowConfigManager.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/flow-editor/FlowConfigManager.tsx)], se incorporó una propiedad `readOnly` para deshabilitar las interacciones de arrastre de nodos, conexiones, enfoque de bordes y borrado por teclado cuando el usuario carece de permisos de edición (`!hasEditRights`).
+- **Confirmación con Shadcn/ui Dialog e Interacción de Doble Clic**:
+  - Reemplazado `window.confirm()` en [[settings-client.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/settings/settings-client.tsx)] y [[project-team-panel.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/[projectId]/settings/project-team-panel.tsx)] con el componente interactivo `<Dialog>` de Shadcn para la eliminación de usuarios de la organización o proyecto.
+  - Envuelto el retorno principal de `settings-client.tsx` en un fragmento de React para resolver la sintaxis del JSX tras insertar el diálogo al final.
+  - Modificado [[project-team-panel.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/[projectId]/settings/project-team-panel.tsx)] para que los roles de los miembros aparezcan inicialmente como Badges estáticos. Al hacer doble clic sobre un Badge (siempre que el usuario tenga privilegios de edición y no sea él mismo), este se transforma dinámicamente en un combo `<Select>` de Shadcn para cambiar el rol. Una vez confirmada la selección o al cerrar el combo, vuelve a representarse como un Badge.
+- **Métricas en Dashboard**:
+  - Modificado [[dashboard-actions.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/dashboard-actions.ts)] para recuperar de forma paralela en Supabase la cantidad de documentos no eliminados y de revisiones pendientes (`IN_REVIEW`, `COMMENTED`) para cada proyecto del usuario. Se solucionó una instanciación de tipos recursiva profunda en PostgREST realizando un casting limpio a `any`.
+  - En [[page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/page.tsx)], se agregaron badges con contadores informativos y micro-iconos en las tarjetas de proyecto.
+- **Fechas e Historial en DocumentDrawer**:
+  - En [[document-drawer.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/document-drawer.tsx)], se muestra el log de emisión completo con fecha base, fecha de emisión real, fecha reprogramada con alertas visuales de atraso y el número de reprogramaciones realizadas.
+
+### 2. Cambios en Base de Datos
+- **Estado:** Sin modificaciones de esquema SQL en esta sesión.
+
+### 3. Plan de Control e Integridad
+- **Compilación de Producción**:
+  - Ejecutado `npm run build` confirmando la correcta construcción del proyecto en Next.js Turbopack con 0 errores y exitosa verificación de TypeScript.
+
+## [2026-06-01] Sesión 11: Correos de Solicitud de Acceso con Enlaces de Aprobación/Rechazo Directos
+**Hora:** 14:01 (Local Time)  
+**Objetivo:** Implementar el envío de correos electrónicos automáticos a todos los administradores de una organización cuando un usuario solicita acceso (con CC al solicitante) incorporando enlaces directos y seguros para Aprobar o Rechazar la solicitud desde el correo.
+
+### 1. Cambios en Código (Next.js & Resend API)
+- **Plantilla de Correo de Solicitud**:
+  - Creada la función `getJoinRequestEmailHtml` en [[email-templates.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/lib/email-templates.ts)] para generar un correo Notion-style descriptivo con la información del solicitante y botones con enlaces de Aprobar y Rechazar.
+- **Ruta de Control de Solicitudes (Approve/Reject links)**:
+  - Creado el Route Handler [[route.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/auth/join-request/route.ts)] que intercepta las peticiones de aprobación o rechazo (`GET /auth/join-request?id=...&action=approve`).
+  - El handler valida que el usuario solicitante esté autenticado, sea administrador de la organización correspondiente, y que la solicitud esté pendiente. Procesa la aprobación (asociando al usuario a la organización) o el rechazo, e introduce query parameters de retorno (`success`, `error` o `message`).
+- **Control de Notificaciones en Ajustes**:
+  - Modificado [[settings-client.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/settings/settings-client.tsx)] para leer estos parámetros a través de `useSearchParams` y desplegar banners interactivos correspondientes a la acción ("Solicitud de acceso aprobada correctamente", etc.), limpiando el query string para evitar re-alertas al actualizar.
+- **Acción del Onboarding**:
+  - Modificado `joinExistingOrgAction` en [[actions.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/onboarding/actions.ts)] para que tras guardar la solicitud en Supabase se consulte a todos los administradores de la organización y se dispare el correo asíncronamente con CC al solicitante.
+
+### 2. Cambios en Base de Datos
+- **Estado:** Sin modificaciones de esquema SQL en esta sesión.
+
+### 3. Plan de Control e Integridad
+- **Compilación de Producción**:
+  - Ejecutado `npm run build` confirmando la correcta construcción del proyecto en Next.js Turbopack con 0 errores y exitosa verificación de TypeScript.
+
+## [2026-06-01] Sesión 12: Corrección de Visualización en Selectores Base UI (SelectValue format rendering)
+**Hora:** 14:10 (Local Time)  
+**Objetivo:** Solucionar el problema en el cual los selectores cerrados del panel de equipo mostraban valores internos crudos (como UUIDs en la selección de usuario, o el identificador en mayúsculas `"REVIEWER"` en el de rol) en lugar del nombre descriptivo.
+
+### 1. Cambios en Código (Base UI Select format)
+- **SelectValue Custom Formatting**:
+  - Modificado [[project-team-panel.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/[projectId]/settings/project-team-panel.tsx)] para pasar funciones de renderizado personalizadas como hijos (`children`) de los componentes `<SelectValue>`. 
+  - La función de formato del selector de usuario busca de manera reactiva el ID seleccionado en la lista `orgMembers` para extraer y renderizar su `full_name`.
+  - La función de formato de roles mapea el identificador de rol a su etiqueta amigable correspondiente (`ROLE_LABELS`).
+  - Las funciones se tiparon/castearon como `any` para cumplir con las propiedades tipadas del envoltorio sin comprometer la compilación de TypeScript.
+
+### 2. Cambios en Base de Datos
+- **Estado:** Sin modificaciones de esquema SQL en esta sesión.
+
+### 3. Plan de Control e Integridad
+- **Compilación de Producción**:
+  - Ejecutado `npm run build` confirmando la correcta construcción del proyecto en Next.js Turbopack con 0 errores y exitosa verificación de TypeScript.
+
+## [2026-06-01] Sesión 13: Archivar Proyecto, Eliminación Lógica y Papelera de Reciclaje de 30 días
+**Hora:** 15:41 (Local Time)  
+**Objetivo:** Implementar la lógica para archivar y eliminar proyectos, restringir la descarga de versiones intermedias y crear una Papelera de reciclaje interactiva de 30 días con autogestión de restauración y purga física de archivos de storage y base de datos.
+
+### 1. Cambios en Código (Next.js & UI)
+- **Archivar Proyecto**:
+  - En [[actions.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/actions.ts)], agregada `archiveProjectAction` que establece `archived_at = NOW()`.
+  - Agregadas guardias en todas las Server Actions de modificación de proyectos, MDL, revisiones, clientes y transmittals para bloquear operaciones si el proyecto está archivado.
+- **Acceso a Versiones Intermedias**:
+  - Modificado `getDownloadUrlAction` para restringir descargas de archivos intermedios en proyectos archivados únicamente a Org Admins y Coordinadores.
+  - Modificado [[revision-timeline.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/revision-timeline.tsx)] para deshabilitar las descargas directas a usuarios comunes para versiones anteriores, y agregar el botón de "Copiar enlace seguro" (presigned url) para perfiles privilegiados.
+- **Papelera de 30 días (Soft Delete)**:
+  - En [[actions.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/actions.ts)], implementada `deleteProjectAction` que hace soft delete actualizando `deleted_at = NOW()`.
+  - Creadas las acciones `getDeletedProjectsAction`, `restoreProjectAction` y `purgeProjectAction`.
+  - Implementado `purgeProjectStorageFiles` que recorre secuencialmente los archivos del proyecto y los elimina físicamente del bucket en Supabase Storage (o R2) a través de `storageService.deleteFile` antes de la eliminación en cascada de la base de datos.
+  - Creado el componente interactivo [[trashcan-button.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/layout/trashcan-button.tsx)] y renderizado en la cabecera del panel de control [[page.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/page.tsx)] para Org Admins.
+- **Ampliación de Papelera a Documentos**:
+  - Implementada la Server Action `deleteDocumentAction` en [[actions.ts (MDL)](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/[projectId]/mdl/actions.ts)] para marcar un documento como eliminado (`deleted_at = NOW()`).
+  - Implementada la opción "Eliminar Documento" en [[document-drawer.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/documents/document-drawer.tsx)] con un diálogo de confirmación seguro (exclusivo para Admins/Coordinadores).
+  - Creadas las Server Actions `getDeletedDocumentsAction`, `restoreDocumentAction` y `purgeDocumentAction` en [[actions.ts (Projects)](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/actions.ts)].
+  - Implementada `purgeDocumentStorageFiles` para limpiar físicamente del storage todos los archivos cargados en todas las revisiones del documento al vaciar la papelera de forma definitiva.
+  - Rediseñado el diálogo [[trashcan-button.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/components/layout/trashcan-button.tsx)] para incorporar **pestañas (Tabs)** de modo que los Org Admins puedan administrar por separado **Proyectos** y **Planos / Documentos** con sus respectivas acciones de restauración y purga.
+- **Zona de Peligro en Configuración**:
+  - Modificado [[settings-tabs-client.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/[projectId]/settings/settings-tabs-client.tsx)] para añadir la sección "Zona de Peligro", reemplazando triggers `asChild` incompatibles con el prop `render` de Base UI.
+
+### 2. Cambios en Base de Datos (Supabase)
+- Creada la migración [[20260601_project_deletion_and_archiving.sql](file:///home/diegogto/Documents/Projects/Faberdoc/supabase/migrations/20260601_project_deletion_and_archiving.sql)] y sincronizada en [[schema.sql](file:///home/diegogto/Documents/Projects/Faberdoc/supabase/schema.sql)]:
+  - Agregada columna `archived_at` a la tabla `projects`.
+  - Actualizados los foreign keys de `documents`, `transmittals` y `transmittal_items` con `ON DELETE CASCADE`.
+  - Actualizada la política RLS `Users can view their projects` para permitir a administradores de la organización ver los proyectos soft-deleted.
+
+### 3. Plan de Control e Integridad
+- **Compilación de Producción**:
+  - Ejecutado `npm run build` completándose con éxito absoluto, verificando tipado de TypeScript y empaquetado en Next.js.
+
+
+

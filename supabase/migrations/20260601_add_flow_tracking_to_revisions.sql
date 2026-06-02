@@ -1,0 +1,2 @@
+ALTER TABLE revisions ADD COLUMN IF NOT EXISTS current_flow_id VARCHAR(100);
+ALTER TABLE revisions ADD COLUMN IF NOT EXISTS active_nodes JSONB NOT NULL DEFAULT '[]'::jsonb;

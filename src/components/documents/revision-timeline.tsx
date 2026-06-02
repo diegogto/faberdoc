@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { FileText, MessageSquare, Download, User, Check } from "lucide-react";
+import { FileText, MessageSquare, Download, User, Check, Lock, Link, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { respondToCommentAction, getDownloadUrlAction } from "@/app/(dashboard)/projects/[projectId]/mdl/revision-actions";
 import type { Revision, FileRecord, Comment } from "@/lib/types";
@@ -15,6 +15,8 @@ interface RevisionTimelineProps {
   })[];
   projectId?: string;
   onRefresh?: () => void;
+  isProjectArchived?: boolean;
+  canAccessArchivedIntermediate?: boolean;
 }
 
 function formatFileSize(bytes: number): string {
@@ -31,10 +33,35 @@ function formatDate(dateString: string): string {
   });
 }
 
-export function RevisionTimeline({ revisions, projectId, onRefresh }: RevisionTimelineProps) {
+export function RevisionTimeline({
+  revisions,
+  projectId,
+  onRefresh,
+  isProjectArchived = false,
+  canAccessArchivedIntermediate = false,
+}: RevisionTimelineProps) {
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
   const [responseText, setResponseText] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyLink = async (s3Key: string, fileId: string) => {
+    if (!projectId) return;
+    try {
+      const res = await getDownloadUrlAction(projectId, s3Key);
+      if (res.error) {
+        alert(res.error);
+        return;
+      }
+      if (res.url) {
+        await navigator.clipboard.writeText(res.url);
+        setCopiedId(fileId);
+        setTimeout(() => setCopiedId(null), 2000);
+      }
+    } catch (err) {
+      alert("Error al copiar el enlace de descarga.");
+    }
+  };
 
   const handleRespond = (commentId: string, closeComment: boolean) => {
     if (!projectId || !responseText.trim()) return;
@@ -137,6 +164,82 @@ export function RevisionTimeline({ revisions, projectId, onRefresh }: RevisionTi
               {revision.files.length > 0 && (
                 <div className="space-y-1.5 mt-2">
                   {revision.files.map((file) => {
+                    const isIntermediate = index > 0;
+                    const isDownloadRestricted = isProjectArchived && isIntermediate;
+
+                    if (isDownloadRestricted) {
+                      if (canAccessArchivedIntermediate) {
+                        // Privileged user: show custom download & copy link
+                        return (
+                          <div
+                            key={file.id}
+                            className="flex w-full items-center gap-2 rounded-md border border-amber-200/60 dark:border-amber-900/30 bg-amber-50/20 dark:bg-amber-950/5 px-3 py-2 text-sm group"
+                          >
+                            <FileText className="h-4 w-4 text-amber-600 dark:text-amber-505 shrink-0" />
+                            <span className="truncate flex-1 text-[13px] text-zinc-800 dark:text-zinc-200 font-medium">
+                              {file.file_name}
+                              <span className="ml-2 text-[10px] text-amber-600 dark:text-amber-500 font-semibold bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 rounded-full border border-amber-100 dark:border-amber-900/20">
+                                Archivado (Acceso Admin)
+                              </span>
+                            </span>
+                            <span className="text-xs text-zinc-500 shrink-0 mr-2">
+                              {formatFileSize(file.file_size_bytes)}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 hover:bg-amber-100/50 dark:hover:bg-amber-950/20 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 cursor-pointer"
+                                onClick={() => handleDownload(file.s3_key, file.file_name)}
+                                title="Descargar plano"
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs hover:bg-amber-100/50 dark:hover:bg-amber-950/20 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 gap-1 cursor-pointer"
+                                onClick={() => handleCopyLink(file.s3_key, file.id)}
+                                title="Copiar enlace único de descarga"
+                              >
+                                {copiedId === file.id ? (
+                                  <>
+                                    <Check className="h-3 w-3 text-green-600" />
+                                    <span className="text-[10px] text-green-600 font-semibold">Copiado</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Link className="h-3 w-3" />
+                                    <span className="text-[10px]">Copiar Link</span>
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        // Regular user: locked intermediate version
+                        return (
+                          <div
+                            key={file.id}
+                            className="flex w-full items-center gap-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 px-3 py-2 text-sm select-none opacity-75"
+                          >
+                            <Lock className="h-4 w-4 text-zinc-400 shrink-0" />
+                            <span className="truncate flex-1 text-[13px] text-zinc-500 dark:text-zinc-400 font-medium">
+                              {file.file_name}
+                              <span className="ml-2 text-[10px] text-zinc-400 dark:text-zinc-500 font-semibold bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded-full border border-zinc-200/40 dark:border-zinc-700/40">
+                                Archivado
+                              </span>
+                            </span>
+                            <span className="text-xs text-zinc-400 shrink-0">
+                              {formatFileSize(file.file_size_bytes)}
+                            </span>
+                          </div>
+                        );
+                      }
+                    }
+
+                    // Standard un-restricted document download (e.g. latest version)
                     return (
                       <button
                         key={file.id}

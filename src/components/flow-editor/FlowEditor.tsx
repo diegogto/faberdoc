@@ -26,7 +26,7 @@ import { CombinerNode } from "./nodes/CombinerNode";
 import { ExecutorNode } from "./nodes/ExecutorNode";
 import { saveReviewFlowAction } from "@/app/(dashboard)/projects/actions";
 import { Button } from "@/components/ui/button";
-import { Save, GitMerge, Loader2, Wrench } from "lucide-react";
+import { Save, GitMerge, Loader2, Wrench, AlertTriangle } from "lucide-react";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -68,6 +68,15 @@ function edgeTypeFromHandle(sourceHandle: string | null | undefined): string {
   return "flow";
 }
 
+function getEdgePathOptions(sourceHandle: string | null | undefined) {
+  // Las líneas de retorno ("Re-revisar") salen de la derecha y vuelven a la izquierda,
+  // por lo que les damos un offset mayor (45px) para que giren más a la derecha
+  // y no se crucen directamente con las líneas de ida (offset 25px).
+  const isReturn = sourceHandle === "rereview";
+  return { borderRadius: 15, offset: isReturn ? 45 : 25 };
+}
+
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface ReviewerOption {
@@ -95,6 +104,8 @@ export interface FlowEditorProps {
   flowId?: string;
   /** Increment this value to trigger a save action from parent */
   saveTrigger?: number;
+  /** When true, the canvas is fully read-only (no drag, connect, or delete) */
+  readOnly?: boolean;
 }
 
 // ─── Initial fixed nodes ────────────────────────────────────────────────────
@@ -122,7 +133,7 @@ function buildInitialEdges(savedEdges?: FlowConfig["edges"]): Edge[] {
     return {
       ...e,
       type: "smoothstep",
-      pathOptions: { borderRadius: 15 },
+      pathOptions: getEdgePathOptions(e.sourceHandle),
       data: { ...(e.data ?? {}), edgeType },
       style: { stroke: color, strokeWidth: 2 },
       markerEnd: { type: MarkerType.ArrowClosed, color },
@@ -142,9 +153,15 @@ export function FlowEditor({
   onFlowChange,
   flowId,
   saveTrigger = 0,
+  readOnly = false,
 }: FlowEditorProps) {
   const [nodes, setNodes, onNodesChangeState] = useNodesState(buildInitialNodes(initialConfig?.nodes));
   const [edges, setEdges, onEdgesChange] = useEdgesState(buildInitialEdges(initialConfig?.edges));
+
+  const hasNonContinuingNode = nodes.some((node) => {
+    if (node.id === FIXED_APPROVED_ID) return false;
+    return !edges.some((edge) => edge.source === node.id);
+  });
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -194,7 +211,7 @@ export function FlowEditor({
             ...connection,
             id: genId("edge"),
             type: "smoothstep",
-            pathOptions: { borderRadius: 15 },
+            pathOptions: getEdgePathOptions(connection.sourceHandle),
             data: { edgeType },
             style: { stroke: color, strokeWidth: 2 },
             markerEnd: { type: MarkerType.ArrowClosed, color },
@@ -289,6 +306,11 @@ export function FlowEditor({
       return;
     }
 
+    if (hasNonContinuingNode) {
+      setSaveError('Todos los nodos del flujo deben continuar y conectarse a un nodo siguiente (excepto el de aprobación final).');
+      return;
+    }
+
     if (onFlowChange) {
       const flowConfig = buildFlowConfig();
       onFlowChange(flowConfig);
@@ -347,6 +369,12 @@ export function FlowEditor({
           {saveMsg}
         </div>
       )}
+      {hasNonContinuingNode && (
+        <div className="p-3 text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/20 dark:text-amber-400 rounded-md border border-amber-200 dark:border-amber-900/30 font-medium flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
+          <span>Para guardar, todos los nodos del diagrama deben conectarse a un nodo siguiente (excepto el nodo final).</span>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
@@ -380,7 +408,7 @@ export function FlowEditor({
             type="button"
             size="sm"
             onClick={handleSave}
-            disabled={isPending}
+            disabled={isPending || hasNonContinuingNode}
             className="gap-1.5 text-xs h-8 cursor-pointer"
           >
             {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
@@ -436,16 +464,20 @@ export function FlowEditor({
           <ReactFlow
             nodes={nodes}
             edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
+            onNodesChange={readOnly ? undefined : onNodesChange}
+            onEdgesChange={readOnly ? undefined : onEdgesChange}
+            onConnect={readOnly ? undefined : onConnect}
             nodeTypes={NODE_TYPES}
+            nodesDraggable={!readOnly}
+            nodesConnectable={!readOnly}
+            edgesFocusable={!readOnly}
+            elementsSelectable={!readOnly}
             fitView
             fitViewOptions={{ padding: 0.3 }}
-            deleteKeyCode="Delete"
+            deleteKeyCode={readOnly ? null : "Delete"}
             defaultEdgeOptions={{
               type: "smoothstep",
-              pathOptions: { borderRadius: 15 },
+              pathOptions: { borderRadius: 15, offset: 25 },
               style: { strokeWidth: 2, stroke: "#94a3b8" },
               markerEnd: { type: MarkerType.ArrowClosed },
             } as any}

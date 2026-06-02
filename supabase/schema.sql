@@ -85,13 +85,14 @@ CREATE TABLE IF NOT EXISTS projects (
     client_info JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
+    archived_at TIMESTAMPTZ,
     deleted_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS project_members (
     project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    role VARCHAR(50) NOT NULL CHECK (role IN ('ADMIN', 'COORDINATOR', 'REVIEWER', 'OWNER_APPROVER', 'VIEWER')),
+    role VARCHAR(50) NOT NULL CHECK (role IN ('ADMIN', 'COORDINATOR', 'REVIEWER', 'OWNER_APPROVER', 'VIEWER', 'UPLOADER')),
     PRIMARY KEY (project_id, user_id)
 );
 
@@ -110,7 +111,7 @@ CREATE TABLE IF NOT EXISTS project_connections (
 
 CREATE TABLE IF NOT EXISTS documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    project_id UUID REFERENCES projects(id) NOT NULL,
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE NOT NULL,
     document_code VARCHAR(255) NOT NULL,
     title VARCHAR(255) NOT NULL,
     custom_properties JSONB,
@@ -131,6 +132,8 @@ CREATE TABLE IF NOT EXISTS revisions (
     status VARCHAR(50) NOT NULL CHECK (status IN ('DRAFT', 'IN_REVIEW', 'COMMENTED', 'APPROVED', 'ISSUED')),
     emission_code VARCHAR(50),
     comment_level VARCHAR(20) CHECK (comment_level IN ('MINOR', 'MAJOR')),
+    current_flow_id VARCHAR(100),
+    active_nodes JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -157,7 +160,7 @@ CREATE TABLE IF NOT EXISTS issuance_logs (
 
 CREATE TABLE IF NOT EXISTS transmittals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    project_id UUID REFERENCES projects(id) NOT NULL,
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE NOT NULL,
     transmittal_code VARCHAR(255) NOT NULL,
     sender_id UUID REFERENCES users(id) NOT NULL,
     recipient_org_id UUID REFERENCES organizations(id) NOT NULL,
@@ -168,7 +171,7 @@ CREATE TABLE IF NOT EXISTS transmittals (
 CREATE TABLE IF NOT EXISTS transmittal_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     transmittal_id UUID REFERENCES transmittals(id) ON DELETE CASCADE NOT NULL,
-    revision_id UUID REFERENCES revisions(id) NOT NULL,
+    revision_id UUID REFERENCES revisions(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -330,13 +333,15 @@ CREATE POLICY "Users can view their projects"
     ON projects FOR SELECT
     USING (
         (
+            public.is_user_admin(auth.uid(), organization_id) = TRUE
+        )
+        OR (
             id IN (
                 SELECT project_id FROM public.project_members
                 WHERE user_id = auth.uid()
             )
-            OR public.is_user_admin(auth.uid(), organization_id) = TRUE
+            AND deleted_at IS NULL
         )
-        AND deleted_at IS NULL
     );
 
 CREATE POLICY "Admins can insert projects"

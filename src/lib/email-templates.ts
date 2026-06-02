@@ -667,3 +667,65 @@ export function getClientConnectionEmailHtml(
     logoUrl,
   });
 }
+
+/**
+ * 10. Correo de notificación de solicitud de acceso (join request) pendiente a los administradores
+ */
+export function getJoinRequestEmailHtml(
+  requesterName: string,
+  requesterEmail: string,
+  orgName: string,
+  approveLink: string,
+  rejectLink: string,
+  settingsLink: string,
+  logoUrl?: string | null
+): string {
+  const contentHtml = `
+    <h2 style="margin-top: 0; margin-bottom: 16px; font-size: 18px; font-weight: 700; color: #2e3e56; letter-spacing: -0.01em;">
+      Solicitud de Acceso Pendiente
+    </h2>
+    <p style="margin: 0 0 16px 0; color: #475569;">Hola,</p>
+    <p style="margin: 0 0 24px 0; color: #475569;">
+      El colaborador <strong>${requesterName}</strong> (${requesterEmail}) ha solicitado unirse a tu organización <strong>${orgName}</strong> en Faberdoc.
+    </p>
+
+    <!-- Requester Info Card -->
+    <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 24px 0;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+          <td style="padding-bottom: 8px; font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase; width: 120px;">Nombre:</td>
+          <td style="padding-bottom: 8px; font-size: 14px; font-weight: 700; color: #2e3e56;">${requesterName}</td>
+        </tr>
+        <tr>
+          <td style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Correo:</td>
+          <td style="font-size: 14px; color: #334155;">${requesterEmail}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Botones de Acción -->
+    <div style="margin: 28px 0; text-align: center;">
+      <a href="${approveLink}" style="display: inline-block; background-color: #2e3e56; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); margin-right: 12px;">
+        Aprobar Solicitud
+      </a>
+      <a href="${rejectLink}" style="display: inline-block; background-color: #ffffff; color: #ef4444; border: 1px solid #fca5a5; padding: 9px 19px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 13px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);">
+        Rechazar
+      </a>
+    </div>
+
+    <p style="margin: 24px 0 0 0; font-size: 13px; color: #64748b;">
+      También puedes gestionar esta solicitud ingresando directamente al panel de administración en la sección de Ajustes:
+    </p>
+    <p style="margin: 16px 0 0 0; font-size: 11px; color: #94a3b8; word-break: break-all;">
+      Enlace directo:<br />
+      <a href="${settingsLink}" style="color: #3e689a; text-decoration: underline;">${settingsLink}</a>
+    </p>
+  `;
+
+  return getBaseEmailLayout({
+    title: "Solicitud de acceso pendiente - Faberdoc",
+    previewText: `${requesterName} solicita unirse a ${orgName} en Faberdoc.`,
+    contentHtml,
+    logoUrl,
+  });
+}

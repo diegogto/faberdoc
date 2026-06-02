@@ -26,6 +26,11 @@ interface DocumentToolbarProps {
   customPropertiesDef: CustomPropertyDefinition[];
   onNewDocumentClick: () => void;
   onImportCSVClick: () => void;
+  filterTab?: "all" | "pending";
+  onFilterTabChange?: (tab: "all" | "pending") => void;
+  currentUserId?: string;
+  pendingCount?: number;
+  isProjectArchived?: boolean;
 }
 
 const STATUS_OPTIONS = [
@@ -40,14 +45,50 @@ export function DocumentToolbar({
   customPropertiesDef,
   onNewDocumentClick,
   onImportCSVClick,
+  filterTab = "all",
+  onFilterTabChange,
+  currentUserId,
+  pendingCount = 0,
+  isProjectArchived = false,
 }: DocumentToolbarProps) {
   const isFiltered = table.getState().columnFilters.length > 0;
   const globalFilter = table.getState().globalFilter ?? "";
 
   return (
-    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 py-3.5 px-4 border-b border-border/50 bg-background/50 backdrop-blur-xs">
+    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 py-3.5 px-4 border-b border-border/50 bg-background/50 backdrop-blur-xs">
       {/* Filters Left Section */}
       <div className="flex flex-wrap items-center gap-2 flex-1">
+        {/* Tab Switcher */}
+        {currentUserId && onFilterTabChange && (
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 p-0.5 rounded-lg border border-zinc-200/50 dark:border-zinc-800/40 shrink-0">
+            <button
+              onClick={() => onFilterTabChange("all")}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                filterTab === "all"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-xs font-bold"
+                  : "text-zinc-500 hover:text-zinc-950 dark:hover:text-zinc-100"
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => onFilterTabChange("pending")}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                filterTab === "pending"
+                  ? "bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 shadow-xs font-bold"
+                  : "text-zinc-500 hover:text-zinc-950 dark:hover:text-zinc-100"
+              }`}
+            >
+              Mis Pendientes
+              {pendingCount > 0 && (
+                <span className="inline-flex items-center justify-center bg-[#2e3e56] text-white dark:bg-[#3e689a] text-[9px] font-bold px-1.5 py-0.5 rounded-full h-4 min-w-4 animate-pulse">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
         {/* Global search */}
         <div className="relative w-full sm:w-[220px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -176,25 +217,29 @@ export function DocumentToolbar({
         </DropdownMenu>
 
         {/* CSV Import */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onImportCSVClick}
-          className="h-8 text-xs gap-1.5 border-border/80 bg-background hover:bg-muted/50"
-        >
-          <Upload className="h-3.5 w-3.5" />
-          Importar CSV
-        </Button>
+        {!isProjectArchived && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onImportCSVClick}
+            className="h-8 text-xs gap-1.5 border-border/80 bg-background hover:bg-muted/50 cursor-pointer"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            Importar CSV
+          </Button>
+        )}
 
         {/* New Document */}
-        <Button
-          size="sm"
-          onClick={onNewDocumentClick}
-          className="h-8 text-xs gap-1.5 shadow-xs"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Nuevo Documento
-        </Button>
+        {!isProjectArchived && (
+          <Button
+            size="sm"
+            onClick={onNewDocumentClick}
+            className="h-8 text-xs gap-1.5 shadow-xs cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nuevo Documento
+          </Button>
+        )}
       </div>
     </div>
   );

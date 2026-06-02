@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { checkIfProjectArchived } from "@/app/(dashboard)/projects/actions";
 
 // Validaciones
 const documentSchema = z.object({
@@ -93,9 +94,14 @@ async function verifyUserProjectAccess(projectId: string) {
     return { error: "No tienes permisos en este proyecto.", user: null };
   }
 
-  const allowedRoles = ["ADMIN", "COORDINATOR", "REVIEWER", "OWNER_APPROVER"];
+  const allowedRoles = ["ADMIN", "COORDINATOR", "REVIEWER", "OWNER_APPROVER", "UPLOADER"];
   if (!allowedRoles.includes(member.role)) {
     return { error: "No tienes permisos de edición en este proyecto.", user: null };
+  }
+
+  // Verificar si el proyecto está archivado
+  if (await checkIfProjectArchived(projectId, userSupabase)) {
+    return { error: "Este proyecto está archivado y no puede ser modificado.", user: null };
   }
 
   return { user, error: null };
@@ -352,3 +358,31 @@ export async function bulkImportDocumentsAction(
     return { error: "Ocurrió un error inesperado al realizar la importación masiva." };
   }
 }
+
+export async function deleteDocumentAction(projectId: string, documentId: string) {
+  const access = await verifyUserProjectAccess(projectId);
+  if (access.error || !access.user) {
+    return { error: access.error };
+  }
+
+  const adminSupabase = createAdminClient();
+
+  try {
+    const { error } = await adminSupabase
+      .from("documents")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", documentId)
+      .eq("project_id", projectId);
+
+    if (error) {
+      return { error: `Error al eliminar el documento: ${error.message}` };
+    }
+
+    revalidatePath(`/projects/${projectId}/mdl`);
+    return { success: true };
+  } catch (err) {
+    console.error("Excepción en eliminar documento:", err);
+    return { error: "Error inesperado al eliminar el documento." };
+  }
+}
+

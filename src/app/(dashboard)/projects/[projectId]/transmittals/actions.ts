@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/email";
 import { getTransmittalEmailHtml } from "@/lib/email-templates";
 import { formatVersionLabel } from "@/lib/version-utils";
+import { checkIfProjectArchived } from "@/app/(dashboard)/projects/actions";
 
 /**
  * Verifies if user has edit rights for a project
@@ -129,6 +130,10 @@ export async function createTransmittalAction(
   revisionIds: string[],
   emissionCode?: string
 ) {
+  const supabase = await createClient();
+  if (await checkIfProjectArchived(projectId, supabase)) {
+    return { error: "Este proyecto está archivado y no puede ser modificado." };
+  }
   const access = await verifyUserProjectAccess(projectId);
   if (access.error || !access.user) {
     return { error: access.error };

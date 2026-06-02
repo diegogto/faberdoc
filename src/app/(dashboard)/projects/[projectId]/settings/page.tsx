@@ -19,7 +19,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
   const { data: project } = await supabase
     .from("projects")
     .select(
-      "id, name, naming_pattern, versioning_logic, review_flow_config, custom_properties_definition, organization_id, description, location, location_details, client_name, versioning_format_config"
+      "id, name, naming_pattern, versioning_logic, review_flow_config, custom_properties_definition, organization_id, description, location, location_details, client_name, versioning_format_config, archived_at"
     )
     .eq("id", projectId)
     .is("deleted_at", null)

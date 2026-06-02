@@ -25,7 +25,7 @@ export const MOCK_CURRENT_USER_ORG_ID = "org-001";
 export const mockOrganizations: Organization[] = [
   {
     id: "org-001",
-    name: "Ingeniería Fuller S.A.",
+    name: "Fuller S.A.",
     created_at: "2025-01-15T10:00:00Z",
     updated_at: "2025-01-15T10:00:00Z",
     deleted_at: null,
@@ -197,7 +197,7 @@ export const mockProjectsWithRole: ProjectWithRole[] = [
     id: "proj-001",
     name: "Planta Desaladora Atacama",
     organization_id: "org-001",
-    organization_name: "Ingeniería Fuller S.A.",
+    organization_name: "Fuller S.A.",
     role: "ADMIN",
     is_own_organization: true,
   },
@@ -205,7 +205,7 @@ export const mockProjectsWithRole: ProjectWithRole[] = [
     id: "proj-002",
     name: "Expansión Terminal GNL",
     organization_id: "org-001",
-    organization_name: "Ingeniería Fuller S.A.",
+    organization_name: "Fuller S.A.",
     role: "ADMIN",
     is_own_organization: true,
   },

@@ -20,12 +20,15 @@
 - [x] Configuración del Naming Engine (patrón dinámico como `{PROY}-{ESP}-{NUM}`)
 - [x] Optimizar la vista de configuración de un proyecto (hacerla más amigable, explicativa y dinámica)
   - [x] Rediseñar el configurador de código de documento (Naming Engine) para evitar el ingreso manual de brackets (`{...}`) mediante una interfaz visual con chips o constructores de patrones interactivos
-- [ ] Completar y reordenar pantalla de configuración del proyecto:
-  - [ ] Información del proyecto: nombre, descripción, ubicación, cliente, etc.
-  - [ ] Configuración detallada de nomenclatura (separar código interno de documento vs código emitido con versión/emisión)
-  - [ ] Configurar formatos de versión/emisión (especificar para MIXED y SEPARATE_EMISSION)
-  - [ ] Finalizar el configurador del flujo de revisión y revisiones
-  - [ ] Mejorar la sección para administrar miembros del proyecto (roles, adición, eliminación)
+- [x] Completar y reordenar pantalla de configuración del proyecto:
+  - [x] Información del proyecto: nombre, descripción, ubicación, cliente, etc.
+  - [x] Configuración detallada de nomenclatura (separar código interno de documento vs código emitido con versión/emisión)
+  - [x] Configurar formatos de versión/emisión (especificar para MIXED y SEPARATE_EMISSION)
+  - [x] Finalizar el configurador del flujo de revisión y revisiones
+  - [x] Mejorar la sección para administrar miembros del proyecto (roles, adición, eliminación)
+- [x] Implementar opción de archivar proyecto (modo solo lectura para todos, descargas de versiones anteriores bloqueadas para usuarios comunes y habilitadas para Org Admins/Coordinadores mediante enlace seguro).
+- [x] Implementar opción de eliminar proyectos y planos/documentos individuales (con papelera interactiva de 30 días con pestañas independientes, restauración rápida, y purga física de archivos asociados en storage y base de datos en cascada).
+
 
 ## IV. Master Delivery List (MDL)
 - [x] Tabla principal interactiva (TanStack Table v8 + TanStack Query)
@@ -33,6 +36,9 @@
 - [x] Carga masiva de MDL mediante importación (CSV/Excel)
 - [x] Panel lateral (Sheet/Drawer) para inspeccionar metadatos y línea de tiempo de revisiones sin perder contexto
 - [x] Habilitar la modificación del ancho del sidebar (panel lateral/Sheet) del documento
+- [ ] Reflejar en la vista del documento/revisión el flujo de revisión definido en los diagramas de flujos del proyecto.
+- [ ] Permitir al usuario seleccionar manualmente un flujo de revisión diferente para un documento/revisión si así lo requiere (si bien existirá un flujo automático en función de los atributos del documento, el usuario podrá anularlo y seleccionar uno diferente en este caso).
+
 
 ## V. Control de Revisiones y Almacenamiento
 - [x] Carga de archivos a Supabase Storage con subida directa y segura
@@ -41,7 +47,7 @@
 
 ## VI. Registro de Emisiones y Transmittals
 - [x] Emisiones Formales (Transmittals) y asociación inmutable a revisiones
-- [ ] Control de fechas estimadas vs reales en `issuance_logs` (reprogramaciones automáticas)
+- [x] Control de fechas estimadas vs reales en `issuance_logs` (reprogramaciones automáticas)
 - [ ] Importación y extracción de comentarios formales de revisión sobre PDF
 - [x] Lógica de arrastre de comentarios abiertos (`OPEN`) a la siguiente revisión
 

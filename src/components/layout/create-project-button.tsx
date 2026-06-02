@@ -16,7 +16,7 @@ export function CreateProjectButton() {
       </DialogTrigger>
       <CreateProjectDialogContent
         onClose={() => setIsOpen(false)}
-        description="Ingresa el nombre del proyecto de ingeniería para comenzar a estructurar el control documental."
+        description="Ingresa el nombre del proyecto para comenzar a estructurar el control documental."
       />
     </Dialog>
   );

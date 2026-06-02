@@ -8,6 +8,15 @@ import { sendEmail } from "@/lib/email";
 import { getProjectInviteEmailHtml } from "@/lib/email-templates";
 import { sanitizeHtml } from "@/lib/sanitize";
 
+export async function checkIfProjectArchived(projectId: string, supabase: any): Promise<boolean> {
+  const { data: project } = await supabase
+    .from("projects")
+    .select("archived_at")
+    .eq("id", projectId)
+    .single();
+  return !!project?.archived_at;
+}
+
 const createProjectSchema = z.object({
   name: z
     .string()
@@ -139,6 +148,9 @@ export async function updateProjectSettingsAction(projectId: string, formData: F
   const mode = formData.get("mode") as string; // 'general' | 'naming' or null
 
   try {
+    if (await checkIfProjectArchived(projectId, supabase)) {
+      return { error: "Este proyecto está archivado y no puede ser modificado." };
+    }
     // Security check: must be Org Admin OR Project Coordinator
     const { data: userProfile } = await supabase
       .from("users")
@@ -254,7 +266,7 @@ export async function updateProjectSettingsAction(projectId: string, formData: F
 export async function assignProjectMemberAction(
   projectId: string,
   userId: string,
-  role: "ADMIN" | "COORDINATOR" | "REVIEWER" | "OWNER_APPROVER" | "VIEWER"
+  role: "ADMIN" | "COORDINATOR" | "REVIEWER" | "OWNER_APPROVER" | "VIEWER" | "UPLOADER"
 ) {
   const supabase = await createClient();
   // adminClient bypasea RLS para mutaciones privilegiadas validadas en servidor
@@ -265,6 +277,9 @@ export async function assignProjectMemberAction(
   if (authError || !authUser) return { error: "No estás autenticado." };
 
   try {
+    if (await checkIfProjectArchived(projectId, supabase)) {
+      return { error: "Este proyecto está archivado y no puede ser modificado." };
+    }
     // 2. Obtener el perfil del usuario llamante
     const { data: userProfile } = await supabase
       .from("users")
@@ -364,6 +379,9 @@ export async function updateProjectAttributesAction(projectId: string, attribute
   if (authError || !authUser) return { error: "No autenticado." };
 
   try {
+    if (await checkIfProjectArchived(projectId, supabase)) {
+      return { error: "Este proyecto está archivado y no puede ser modificado." };
+    }
     // Validate authorization: Org Admin or Project Coordinator
     const { data: userProfile } = await supabase
       .from("users")
@@ -420,6 +438,9 @@ export async function removeProjectMemberAction(projectId: string, targetUserId:
   }
 
   try {
+    if (await checkIfProjectArchived(projectId, supabase)) {
+      return { error: "Este proyecto está archivado y no puede ser modificado." };
+    }
     // Verify caller is org admin or project ADMIN
     const { data: userProfile } = await supabase
       .from("users")
@@ -475,6 +496,9 @@ export async function saveReviewFlowAction(
   if (authError || !authUser) return { error: "No estás autenticado." };
 
   try {
+    if (await checkIfProjectArchived(projectId, supabase)) {
+      return { error: "Este proyecto está archivado y no puede ser modificado." };
+    }
     // Verify caller is org admin or project ADMIN
     const { data: userProfile } = await supabase
       .from("users")
@@ -522,6 +546,9 @@ export async function saveProjectFlowsAction(
   if (authError || !authUser) return { error: "No estás autenticado." };
 
   try {
+    if (await checkIfProjectArchived(projectId, supabase)) {
+      return { error: "Este proyecto está archivado y no puede ser modificado." };
+    }
     // Verify caller is org admin or project ADMIN
     const { data: userProfile } = await supabase
       .from("users")
@@ -555,6 +582,512 @@ export async function saveProjectFlowsAction(
     return { error: "Ocurrió un error inesperado al guardar los flujos." };
   }
 }
+
+export async function archiveProjectAction(projectId: string) {
+  const supabase = await createClient();
+
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No estás autenticado." };
+
+  try {
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin")
+      .eq("id", authUser.id)
+      .single();
+
+    const { data: projectMember } = await supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", projectId)
+      .eq("user_id", authUser.id)
+      .single();
+
+    const isOrgAdmin = userProfile?.is_admin === true;
+    const isProjectCoordinator = projectMember?.role === "COORDINATOR" || projectMember?.role === "ADMIN";
+
+    if (!isOrgAdmin && !isProjectCoordinator) {
+      return { error: "No tienes permisos para archivar este proyecto. Debes ser Administrador de la Organización o Coordinador del Proyecto." };
+    }
+
+    if (await checkIfProjectArchived(projectId, supabase)) {
+      return { error: "El proyecto ya está archivado." };
+    }
+
+    const { error } = await supabase
+      .from("projects")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", projectId);
+
+    if (error) {
+      return { error: `Error al archivar el proyecto: ${error.message}` };
+    }
+
+    revalidatePath(`/projects/${projectId}/settings`);
+    revalidatePath(`/projects/${projectId}/mdl`);
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err) {
+    console.error("Excepción en archivar proyecto:", err);
+    return { error: "Error inesperado al archivar el proyecto." };
+  }
+}
+
+export async function deleteProjectAction(projectId: string) {
+  const supabase = await createClient();
+
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No estás autenticado." };
+
+  try {
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin, organization_id")
+      .eq("id", authUser.id)
+      .single();
+
+    if (!userProfile?.is_admin) {
+      return { error: "Solo los administradores de la organización pueden eliminar proyectos." };
+    }
+
+    const { data: project } = await supabase
+      .from("projects")
+      .select("organization_id")
+      .eq("id", projectId)
+      .single();
+
+    if (!project || project.organization_id !== userProfile.organization_id) {
+      return { error: "El proyecto no pertenece a tu organización o no existe." };
+    }
+
+    const adminSupabase = createAdminClient();
+    const { error } = await adminSupabase
+      .from("projects")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", projectId);
+
+    if (error) {
+      return { error: `Error al eliminar el proyecto: ${error.message}` };
+    }
+
+    revalidatePath("/");
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err) {
+    console.error("Excepción en eliminar proyecto:", err);
+    return { error: "Error inesperado al eliminar el proyecto." };
+  }
+}
+
+async function purgeProjectStorageFiles(projectId: string, supabase: any) {
+  try {
+    const { data: docs } = await supabase
+      .from("documents")
+      .select("id")
+      .eq("project_id", projectId);
+
+    if (!docs || docs.length === 0) return;
+    const docIds = docs.map((d: any) => d.id);
+
+    const { data: revs } = await supabase
+      .from("revisions")
+      .select("id")
+      .in("document_id", docIds);
+
+    if (!revs || revs.length === 0) return;
+    const revIds = revs.map((r: any) => r.id);
+
+    const { data: fileRows } = await supabase
+      .from("files")
+      .select("s3_key")
+      .in("revision_id", revIds);
+
+    if (!fileRows || fileRows.length === 0) return;
+    
+    // Import storageService
+    const { storageService } = await import("@/lib/services/storage");
+    
+    for (const row of fileRows) {
+      if (row.s3_key) {
+        try {
+          await storageService.deleteFile(row.s3_key);
+        } catch (storageErr) {
+          console.error(`Error deleting storage file ${row.s3_key}:`, storageErr);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error in purgeProjectStorageFiles:", err);
+  }
+}
+
+export async function getDeletedProjectsAction() {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No estás autenticado." };
+
+  try {
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin, organization_id")
+      .eq("id", authUser.id)
+      .single();
+
+    if (!userProfile?.is_admin || !userProfile.organization_id) {
+      return { error: "Solo los administradores de la organización pueden acceder a la papelera." };
+    }
+
+    // 1. Run automatic cleanup/purge for expired deleted projects (older than 30 days) in this organization
+    const limitDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const adminSupabase = createAdminClient();
+    
+    // Find expired projects in this org
+    const { data: expiredProjects } = await adminSupabase
+      .from("projects")
+      .select("id")
+      .eq("organization_id", userProfile.organization_id)
+      .not("deleted_at", "is", null)
+      .lt("deleted_at", limitDate);
+
+    if (expiredProjects && expiredProjects.length > 0) {
+      for (const ep of expiredProjects) {
+        // Purge files first
+        await purgeProjectStorageFiles(ep.id, adminSupabase);
+        // Physical cascade delete
+        await adminSupabase.from("projects").delete().eq("id", ep.id);
+      }
+    }
+
+    // 2. Fetch active deleted projects (within 30 days)
+    const { data: deletedProjects, error } = await adminSupabase
+      .from("projects")
+      .select("id, name, deleted_at")
+      .eq("organization_id", userProfile.organization_id)
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+
+    if (error) {
+      return { error: `Error al obtener la papelera: ${error.message}` };
+    }
+
+    return { projects: deletedProjects || [] };
+  } catch (err) {
+    console.error("Excepción en getDeletedProjectsAction:", err);
+    return { error: "Error inesperado al cargar la papelera." };
+  }
+}
+
+export async function restoreProjectAction(projectId: string) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No estás autenticado." };
+
+  try {
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin, organization_id")
+      .eq("id", authUser.id)
+      .single();
+
+    if (!userProfile?.is_admin || !userProfile.organization_id) {
+      return { error: "Solo los administradores de la organización pueden restaurar proyectos." };
+    }
+
+    const adminSupabase = createAdminClient();
+    
+    // Verify it belongs to the same org
+    const { data: project } = await adminSupabase
+      .from("projects")
+      .select("organization_id")
+      .eq("id", projectId)
+      .single();
+
+    if (!project || project.organization_id !== userProfile.organization_id) {
+      return { error: "El proyecto no existe o no pertenece a tu organización." };
+    }
+
+    const { error } = await adminSupabase
+      .from("projects")
+      .update({ deleted_at: null })
+      .eq("id", projectId);
+
+    if (error) {
+      return { error: `Error al restaurar el proyecto: ${error.message}` };
+    }
+
+    revalidatePath("/");
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err) {
+    console.error("Excepción en restaurar proyecto:", err);
+    return { error: "Error inesperado al restaurar el proyecto." };
+  }
+}
+
+export async function purgeProjectAction(projectId: string) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No estás autenticado." };
+
+  try {
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin, organization_id")
+      .eq("id", authUser.id)
+      .single();
+
+    if (!userProfile?.is_admin || !userProfile.organization_id) {
+      return { error: "Solo los administradores de la organización pueden vaciar la papelera." };
+    }
+
+    const adminSupabase = createAdminClient();
+    
+    // Verify it belongs to the same org
+    const { data: project } = await adminSupabase
+      .from("projects")
+      .select("organization_id")
+      .eq("id", projectId)
+      .single();
+
+    if (!project || project.organization_id !== userProfile.organization_id) {
+      return { error: "El proyecto no existe o no pertenece a tu organización." };
+    }
+
+    // 1. Purge storage files first
+    await purgeProjectStorageFiles(projectId, adminSupabase);
+
+    // 2. Physical delete from DB (cascades)
+    const { error } = await adminSupabase
+      .from("projects")
+      .delete()
+      .eq("id", projectId);
+
+    if (error) {
+      return { error: `Error al vaciar el proyecto de la papelera: ${error.message}` };
+    }
+
+    revalidatePath("/");
+    revalidatePath("/", "layout");
+    return { success: true };
+  } catch (err) {
+    console.error("Excepción en purgar proyecto:", err);
+    return { error: "Error inesperado al purgar el proyecto." };
+  }
+}
+
+async function purgeDocumentStorageFiles(documentId: string, supabase: any) {
+  try {
+    const { data: revs } = await supabase
+      .from("revisions")
+      .select("id")
+      .eq("document_id", documentId);
+
+    if (!revs || revs.length === 0) return;
+    const revIds = revs.map((r: any) => r.id);
+
+    const { data: fileRows } = await supabase
+      .from("files")
+      .select("s3_key")
+      .in("revision_id", revIds);
+
+    if (!fileRows || fileRows.length === 0) return;
+    
+    // Import storageService
+    const { storageService } = await import("@/lib/services/storage");
+    
+    for (const row of fileRows) {
+      if (row.s3_key) {
+        try {
+          await storageService.deleteFile(row.s3_key);
+        } catch (storageErr) {
+          console.error(`Error deleting storage file ${row.s3_key}:`, storageErr);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error in purgeDocumentStorageFiles:", err);
+  }
+}
+
+export async function getDeletedDocumentsAction() {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No estás autenticado." };
+
+  try {
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin, organization_id")
+      .eq("id", authUser.id)
+      .single();
+
+    if (!userProfile?.is_admin || !userProfile.organization_id) {
+      return { error: "Solo los administradores de la organización pueden acceder a la papelera." };
+    }
+
+    const limitDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const adminSupabase = createAdminClient();
+
+    // 1. Run automatic cleanup/purge for expired deleted documents (older than 30 days) in this organization
+    const { data: expiredDocs } = await adminSupabase
+      .from("documents")
+      .select(`
+        id,
+        projects!inner(organization_id)
+      `)
+      .eq("projects.organization_id", userProfile.organization_id)
+      .not("deleted_at", "is", null)
+      .lt("deleted_at", limitDate);
+
+    if (expiredDocs && expiredDocs.length > 0) {
+      for (const ed of expiredDocs) {
+        // Purge files first
+        await purgeDocumentStorageFiles(ed.id, adminSupabase);
+        // Physical cascade delete
+        await adminSupabase.from("documents").delete().eq("id", ed.id);
+      }
+    }
+
+    // 2. Fetch active deleted documents (within 30 days)
+    const { data: deletedDocs, error } = await adminSupabase
+      .from("documents")
+      .select(`
+        id,
+        document_code,
+        title,
+        deleted_at,
+        projects!inner(id, name, organization_id)
+      `)
+      .eq("projects.organization_id", userProfile.organization_id)
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+
+    if (error) {
+      return { error: `Error al obtener la papelera de documentos: ${error.message}` };
+    }
+
+    const mappedDocs = (deletedDocs || []).map((d: any) => ({
+      id: d.id,
+      document_code: d.document_code,
+      title: d.title,
+      deleted_at: d.deleted_at,
+      project_id: d.projects?.id || "",
+      project_name: d.projects?.name || "",
+    }));
+
+    return { documents: mappedDocs };
+  } catch (err) {
+    console.error("Excepción en getDeletedDocumentsAction:", err);
+    return { error: "Error inesperado al cargar la papelera de documentos." };
+  }
+}
+
+export async function restoreDocumentAction(documentId: string) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No estás autenticado." };
+
+  try {
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin, organization_id")
+      .eq("id", authUser.id)
+      .single();
+
+    if (!userProfile?.is_admin || !userProfile.organization_id) {
+      return { error: "Solo los administradores de la organización pueden restaurar documentos." };
+    }
+
+    const adminSupabase = createAdminClient();
+
+    // Verify it belongs to user's org
+    const { data: doc } = await adminSupabase
+      .from("documents")
+      .select("projects!inner(organization_id, id)")
+      .eq("id", documentId)
+      .single();
+
+    const projectObj = Array.isArray(doc?.projects)
+      ? doc.projects[0]
+      : (doc?.projects as any);
+
+    if (!doc || !projectObj || projectObj.organization_id !== userProfile.organization_id) {
+      return { error: "El documento no existe o no pertenece a tu organización." };
+    }
+
+    const { error } = await adminSupabase
+      .from("documents")
+      .update({ deleted_at: null })
+      .eq("id", documentId);
+
+    if (error) {
+      return { error: `Error al restaurar el documento: ${error.message}` };
+    }
+
+    revalidatePath(`/projects/${projectObj.id}/mdl`);
+    return { success: true };
+  } catch (err) {
+    console.error("Excepción en restaurar documento:", err);
+    return { error: "Error inesperado al restaurar el documento." };
+  }
+}
+
+export async function purgeDocumentAction(documentId: string) {
+  const supabase = await createClient();
+  const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+  if (authError || !authUser) return { error: "No estás autenticado." };
+
+  try {
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("is_admin, organization_id")
+      .eq("id", authUser.id)
+      .single();
+
+    if (!userProfile?.is_admin || !userProfile.organization_id) {
+      return { error: "Solo los administradores de la organización pueden vaciar la papelera." };
+    }
+
+    const adminSupabase = createAdminClient();
+
+    // Verify it belongs to user's org
+    const { data: doc } = await adminSupabase
+      .from("documents")
+      .select("projects!inner(organization_id, id)")
+      .eq("id", documentId)
+      .single();
+
+    const projectObj = Array.isArray(doc?.projects)
+      ? doc.projects[0]
+      : (doc?.projects as any);
+
+    if (!doc || !projectObj || projectObj.organization_id !== userProfile.organization_id) {
+      return { error: "El documento no existe o no pertenece a tu organización." };
+    }
+
+    // 1. Purge storage files first
+    await purgeDocumentStorageFiles(documentId, adminSupabase);
+
+    // 2. Physical delete from DB (cascades)
+    const { error } = await adminSupabase
+      .from("documents")
+      .delete()
+      .eq("id", documentId);
+
+    if (error) {
+      return { error: `Error al vaciar el documento de la papelera: ${error.message}` };
+    }
+
+    revalidatePath(`/projects/${projectObj.id}/mdl`);
+    return { success: true };
+  } catch (err) {
+    console.error("Excepción en purgar documento:", err);
+    return { error: "Error inesperado al purgar el documento." };
+  }
+}
+
+
+
 
 
 

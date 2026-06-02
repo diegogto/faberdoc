@@ -110,6 +110,8 @@ export interface Revision {
   version_label: string;
   version_index: number;
   status: RevisionStatus;
+  current_flow_id?: string | null;
+  active_nodes?: any[];
   created_at: string;
 }
 

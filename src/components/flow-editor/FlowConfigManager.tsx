@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { FlowEditor, type ReviewerOption, type FlowConfig } from "./FlowEditor";
 import { saveProjectFlowsAction } from "@/app/(dashboard)/projects/actions";
-import { Settings, Plus, Play, Trash2, Edit3, CheckCircle, FileText, ArrowRight, Info } from "lucide-react";
+import { Settings, Plus, Play, Trash2, Edit3, CheckCircle, FileText, ArrowRight, Info, AlertTriangle, Lock } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -38,6 +38,8 @@ interface FlowConfigManagerProps {
   customProperties: CustomPropertyDef[];
   reviewers: ReviewerOption[];
   initialFlows?: ReviewFlow[] | null;
+  /** Only ADMIN or COORDINATOR can edit flows */
+  hasEditRights?: boolean;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -47,6 +49,7 @@ export function FlowConfigManager({
   customProperties,
   reviewers,
   initialFlows,
+  hasEditRights = false,
 }: FlowConfigManagerProps) {
   // Normalize and migrate old config if needed
   const [flows, setFlows] = useState<ReviewFlow[]>(() => {
@@ -72,6 +75,8 @@ export function FlowConfigManager({
   const [editingFlow, setEditingFlow] = useState<ReviewFlow | null>(null);
   const [originalFlows, setOriginalFlows] = useState<ReviewFlow[] | null>(null);
   const [saveTrigger, setSaveTrigger] = useState(0);
+  // Orphaned reviewer warning: userIds in the diagram that are no longer project members
+  const [orphanedReviewers, setOrphanedReviewers] = useState<string[]>([]);
 
   const [isPending, startTransition] = useTransition();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -133,6 +138,15 @@ export function FlowConfigManager({
   const openEditor = (flow: ReviewFlow) => {
     setOriginalFlows(JSON.parse(JSON.stringify(flows))); // backup
     setActiveFlowId(flow.id);
+
+    // Detect reviewer nodes whose userId is no longer in the reviewers list
+    const reviewerUserIds = new Set(reviewers.map((r) => r.userId));
+    const flowNodes: any[] = flow.nodes || [];
+    const orphans = flowNodes
+      .filter((n) => n.type === "reviewer" && n.data?.userId && !reviewerUserIds.has(n.data.userId))
+      .map((n) => n.data.userName || n.data.userId);
+    setOrphanedReviewers(orphans);
+
     setIsEditorOpen(true);
     setSaveTrigger(0);
   };
@@ -226,6 +240,14 @@ export function FlowConfigManager({
         </div>
       </div>
 
+      {/* Read-only notice for non-editors */}
+      {!hasEditRights && (
+        <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-900/10 p-3.5 flex gap-2.5 text-xs text-zinc-500 dark:text-zinc-400">
+          <Lock className="h-4 w-4 shrink-0 mt-0.5 text-zinc-400" />
+          <span>Solo los administradores y coordinadores del proyecto pueden editar los flujos de revisión.</span>
+        </div>
+      )}
+
       {/* Flows Grid */}
       <div className="grid grid-cols-1 gap-4">
         {flows.map((flow) => {
@@ -279,7 +301,7 @@ export function FlowConfigManager({
 
               {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                {!flow.isDefault && (
+                {hasEditRights && !flow.isDefault && (
                   <Button
                     type="button"
                     variant="outline"
@@ -300,10 +322,10 @@ export function FlowConfigManager({
                   onClick={() => openEditor(flow)}
                 >
                   <Play className="h-3.5 w-3.5" />
-                  Editar Diagrama
+                  {hasEditRights ? "Editar Diagrama" : "Ver Diagrama"}
                 </Button>
 
-                {!flow.isDefault && (
+                {hasEditRights && !flow.isDefault && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -321,18 +343,20 @@ export function FlowConfigManager({
         })}
       </div>
 
-      {/* Add Flow Trigger */}
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          size="sm"
-          onClick={handleAddFlow}
-          className="gap-1.5 text-xs h-9 cursor-pointer"
-        >
-          <Plus className="h-4 w-4" />
-          Crear Flujo de Revisión
-        </Button>
-      </div>
+      {/* Add Flow Trigger — only for editors */}
+      {hasEditRights && (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleAddFlow}
+            className="gap-1.5 text-xs h-9 cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            Crear Flujo de Revisión
+          </Button>
+        </div>
+      )}
 
       {/* ─── MODAL 1: Diagram Flow Editor ─────────────────────────────────────── */}
       <Dialog open={isEditorOpen} onOpenChange={(open) => { if (!open) handleCancelEditor(); }}>
@@ -340,12 +364,29 @@ export function FlowConfigManager({
           <DialogHeader className="shrink-0 mb-2">
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-zinc-500" />
-              Editar Flujo: <span className="text-primary">{activeFlow?.name}</span>
+              {hasEditRights ? "Editar" : "Ver"} Flujo: <span className="text-primary">{activeFlow?.name}</span>
             </DialogTitle>
             <DialogDescription>
-              Modifica el diagrama del flujo utilizando los nodos disponibles en el panel lateral.
+              {hasEditRights
+                ? "Modifica el diagrama del flujo utilizando los nodos disponibles en el panel lateral."
+                : "Vista de solo lectura del diagrama de revisión del flujo."}
             </DialogDescription>
           </DialogHeader>
+
+          {/* Orphaned reviewers warning */}
+          {orphanedReviewers.length > 0 && (
+            <div className="shrink-0 flex items-start gap-2.5 rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <p className="font-semibold">Revisores sin acceso al proyecto</p>
+                <p>
+                  Los siguientes revisores fueron removidos del equipo pero sus nodos siguen en este diagrama:{" "}
+                  <span className="font-semibold">{orphanedReviewers.join(", ")}</span>.
+                  Considera reemplazarlos o eliminarlos del flujo.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 min-h-0 relative">
             {activeFlow && (
@@ -354,8 +395,9 @@ export function FlowConfigManager({
                 reviewers={reviewers}
                 initialConfig={{ nodes: activeFlow.nodes || [], edges: activeFlow.edges || [] }}
                 showSaveButton={false}
-                onFlowChange={handleUpdateFlowDiagramInMemory}
-                saveTrigger={saveTrigger}
+                onFlowChange={hasEditRights ? handleUpdateFlowDiagramInMemory : undefined}
+                saveTrigger={hasEditRights ? saveTrigger : 0}
+                readOnly={!hasEditRights}
               />
             )}
           </div>
@@ -368,22 +410,24 @@ export function FlowConfigManager({
               onClick={handleCancelEditor}
               className="h-9 text-xs cursor-pointer"
             >
-              Cancelar
+              {hasEditRights ? "Cancelar" : "Cerrar"}
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSaveEditor}
-              className="h-9 text-xs cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              Guardar Cambios
-            </Button>
+            {hasEditRights && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSaveEditor}
+                className="h-9 text-xs cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Guardar Cambios
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* ─── MODAL 2: Rules Editor & Conditions ────────────────────────────────── */}
-      <Dialog open={isRulesOpen} onOpenChange={setIsRulesOpen}>
+      {/* ─── MODAL 2: Rules Editor & Conditions — only for editors ──────────────── */}
+      <Dialog open={isRulesOpen && hasEditRights} onOpenChange={setIsRulesOpen}>
         <DialogContent className="max-w-lg rounded-xl">
           <DialogHeader>
             <DialogTitle>Configurar Reglas del Flujo</DialogTitle>

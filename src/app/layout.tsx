@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Faberdoc — Document Control",
   description:
-    "Sistema de control documental para ingeniería. Gestiona documentos, revisiones y emisiones.",
+    "Sistema de control documental. Gestiona documentos, revisiones y emisiones.",
 };
 
 export default function RootLayout({
