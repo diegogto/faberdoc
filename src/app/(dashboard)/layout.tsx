@@ -23,7 +23,7 @@ export default async function DashboardLayout({
   // Obtener perfil del usuario y su organización
   const { data: userProfile } = await supabase
     .from("users")
-    .select("*, organizations(id, name)")
+    .select("*, organizations(id, name, logo_url)")
     .eq("id", authUser.id)
     .single();
 
@@ -44,6 +44,10 @@ export default async function DashboardLayout({
   const organizationName =
     (userProfile?.organizations as { name: string } | null)?.name ??
     "Mi Organización";
+
+  const organizationLogoUrl =
+    (userProfile?.organizations as { logo_url: string | null } | null)?.logo_url ??
+    null;
 
   const userOrgId = userProfile.organization_id;
 
@@ -98,6 +102,7 @@ export default async function DashboardLayout({
       <Sidebar
         projects={projectsWithRole}
         organizationName={organizationName}
+        organizationLogoUrl={organizationLogoUrl}
         user={currentUser}
       />
 

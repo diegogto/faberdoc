@@ -30,10 +30,11 @@ import { CreateProjectDialogContent } from "./create-project-dialog-content";
 interface SidebarProps {
   projects: ProjectWithRole[];
   organizationName: string;
+  organizationLogoUrl?: string | null;
   user: User;
 }
 
-export function Sidebar({ projects, organizationName, user }: SidebarProps) {
+export function Sidebar({ projects, organizationName, organizationLogoUrl, user }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const pathname = usePathname();
 
@@ -72,6 +73,7 @@ export function Sidebar({ projects, organizationName, user }: SidebarProps) {
                 icon={<Building2 className="h-3.5 w-3.5" />}
                 title={organizationName}
                 isCollapsed={isCollapsed}
+                logoUrl={organizationLogoUrl}
               />
               {!isCollapsed && user.is_admin && (
                 <DialogTrigger
@@ -153,18 +155,45 @@ function SidebarSection({
   icon,
   title,
   isCollapsed,
+  logoUrl,
 }: {
   icon: React.ReactNode;
   title: string;
   isCollapsed: boolean;
+  logoUrl?: string | null;
 }) {
+  const displayIcon = logoUrl ? (
+    <img
+      src={logoUrl}
+      alt={title}
+      className="h-4 w-4 object-contain rounded-xs border border-border/20"
+      onError={(e) => {
+        e.currentTarget.style.display = 'none';
+        const parent = e.currentTarget.parentElement;
+        if (parent) {
+          const fallback = parent.querySelector('.fallback-icon');
+          if (fallback) fallback.classList.remove('hidden');
+        }
+      }}
+    />
+  ) : null;
+
+  const finalIcon = (
+    <span className="flex items-center justify-center shrink-0">
+      {displayIcon}
+      <span className={cn("text-muted-foreground", displayIcon ? "hidden fallback-icon" : "")}>
+        {icon}
+      </span>
+    </span>
+  );
+
   if (isCollapsed) {
     return (
       <Tooltip>
         <TooltipTrigger
-          className="flex items-center justify-center py-2 text-muted-foreground w-full"
+          className="flex items-center justify-center py-2 w-full"
         >
-          {icon}
+          {finalIcon}
         </TooltipTrigger>
         <TooltipContent side="right">{title}</TooltipContent>
       </Tooltip>
@@ -172,8 +201,8 @@ function SidebarSection({
   }
 
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1.5 mb-1">
-      <span className="text-muted-foreground">{icon}</span>
+    <div className="flex items-center gap-1.5 px-2 py-1.5 mb-1 min-w-0">
+      {finalIcon}
       <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground truncate">
         {title}
       </span>
