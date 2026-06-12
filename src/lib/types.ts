@@ -13,7 +13,7 @@ export type ProjectMemberRole =
 
 export type RevisionStatus = "DRAFT" | "IN_REVIEW" | "COMMENTED" | "APPROVED" | "ISSUED";
 
-export type CommentStatus = "OPEN" | "RESPONDED" | "CLOSED";
+export type IssueStatus = "OPEN" | "RESOLVED" | "CLOSED";
 
 export type SubscriptionStatus = "ACTIVE" | "PAST_DUE" | "CANCELED";
 
@@ -33,6 +33,7 @@ export interface User {
   id: string;
   organization_id: string;
   full_name: string;
+  email?: string;
   avatar_url: string | null;
   is_admin?: boolean;
   created_at: string;
@@ -145,15 +146,30 @@ export interface Transmittal {
   created_at: string;
 }
 
-export interface Comment {
+export interface DocumentIssue {
   id: string;
   revision_id: string;
   author_id: string;
   content: string;
-  status: CommentStatus;
+  status: IssueStatus;
   response_text: string | null;
   closed_at: string | null;
   created_at: string;
+}
+
+export interface SystemComment {
+  id: string;
+  parent_id: string | null;
+  author_id: string;
+  content: string;
+  created_at: string;
+  project_id?: string | null;
+  document_id?: string | null;
+  transmittal_id?: string | null;
+  author?: {
+    full_name: string;
+    avatar_url: string | null;
+  };
 }
 
 // ─── View Models (Enriched types for UI display) ────────────────────────────
@@ -196,7 +212,7 @@ export interface DocumentDetail {
   revisions: (Revision & {
     files: FileRecord[];
     uploader_name: string;
-    comments: Comment[];
+    issues: DocumentIssue[];
   })[];
   issuance: IssuanceLog | null;
 }

@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/email";
 import { getTransmittalEmailHtml } from "@/lib/email-templates";
 import { formatVersionLabel } from "@/lib/version-utils";
 import { checkIfProjectArchived } from "@/app/(dashboard)/projects/actions";
+import { checkPastDueByProject } from "@/lib/services/limits";
 
 /**
  * Verifies if user has edit rights for a project
@@ -137,6 +138,11 @@ export async function createTransmittalAction(
   const access = await verifyUserProjectAccess(projectId);
   if (access.error || !access.user) {
     return { error: access.error };
+  }
+
+  const pastDueCheck = await checkPastDueByProject(projectId);
+  if (!pastDueCheck.allowed) {
+    return { error: pastDueCheck.error };
   }
 
   if (!recipientOrgId) {

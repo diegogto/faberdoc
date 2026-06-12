@@ -169,14 +169,25 @@ CREATE TABLE transmittals (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE comments (
+-- Incidencias formales del cliente / revisores (Issues)
+CREATE TABLE document_issues (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     revision_id UUID REFERENCES revisions(id) NOT NULL,
     author_id UUID REFERENCES users(id) NOT NULL,
     content TEXT NOT NULL,
-    status VARCHAR(50) NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'RESOLVED', 'CLOSED')),
     response_text TEXT,
     closed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Comentarios y conversaciones internas (hilos)
+CREATE TABLE document_comments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id UUID REFERENCES documents(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID REFERENCES users(id) NOT NULL,
+    content TEXT NOT NULL,
+    parent_id UUID REFERENCES document_comments(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
@@ -200,7 +211,10 @@ CREATE TABLE comments (
       - Si el cliente ya está registrado, se le envía una solicitud segura de vinculación a su administrador.
       - Si el cliente no existe, se crea una *Ficha Temporal de Cliente* y se le envía una invitación para que registre su organización y reclame su acceso al proyecto, promoviendo la adopción orgánica de la plataforma de forma privada.
    - **Transmittals:** Agrupación formal e inmutable de una o más revisiones aprobadas enviadas a una organización externa, lo que cambia automáticamente el estado de las revisiones de `APPROVED` a `ISSUED`.
-   - **Cierre de Comentarios:** Al generar una nueva revisión, todos los comentarios con estado `OPEN` de la versión anterior se copian automáticamente a la nueva versión.
+   - **Carriles separados para Comentarios e Incidencias:**
+      - **Comentarios:** Hilos de discusión y conversaciones informales internas sobre el documento. No tienen estado formal ni bloquean el flujo de aprobación.
+      - **Incidencias:** Registro formal de observaciones del revisor del cliente. Se cargan manualmente o se extraen del PDF y bloquean el avance del plano.
+   - **Cierre de Incidencias:** Al generar una nueva revisión, todas las incidencias con estado `OPEN` de la versión anterior se copian/arrastran automáticamente a la nueva versión para su resolución.
 
 
 ## **7\. DESPLIEGUE Y DEVOPS (DOKPLOY)**

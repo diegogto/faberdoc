@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export interface ActivityItem {
   id: string;
-  type: "revision" | "comment" | "transmittal";
+  type: "revision" | "comment" | "transmittal" | "issue";
   created_at: string;
   user_name: string;
   project_id: string;
@@ -221,9 +221,9 @@ export async function getDashboardDataAction(): Promise<{ data?: DashboardData; 
       .order("created_at", { ascending: false })
       .limit(15);
 
-    // 5. Fetch recent comments
-    const { data: comments } = await supabase
-      .from("comments")
+    // 5. Fetch recent issues (incidencias)
+    const { data: issues } = await supabase
+      .from("document_issues")
       .select(`
         id,
         created_at,
@@ -280,15 +280,15 @@ export async function getDashboardDataAction(): Promise<{ data?: DashboardData; 
       }
     }
 
-    if (comments) {
-      for (const c of comments) {
+    if (issues) {
+      for (const c of issues) {
         const rev = Array.isArray(c.revision) ? c.revision[0] : (c.revision as any);
         const doc = rev && Array.isArray(rev.document) ? rev.document[0] : (rev?.document as any);
         const proj = doc && Array.isArray(doc.project) ? doc.project[0] : (doc?.project as any);
         if (doc) {
           activities.push({
             id: c.id,
-            type: "comment",
+            type: "issue",
             created_at: c.created_at,
             user_name: extractName(c.author),
             project_id: proj?.id || "",

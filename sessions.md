@@ -386,5 +386,56 @@
   - Ejecutado `npm run build` con éxito total, verificando la ausencia de errores en TypeScript y el empaquetado de producción de Next.js.
 
 
+## [2026-06-11] Sesión 15: Refactorización de Consultas a Server Actions en Rutas de Proyectos
+**Hora:** 20:40 (Local Time)  
+**Objetivo:** Refactorizar todas las consultas directas a la base de datos (con `createClient` del servidor) y comprobaciones de autorización presentes en componentes de página y diseño del subárbol de proyectos a Server Actions unificadas (`actions.ts`), con el fin de cumplir con el principio de separación de responsabilidades (SoC).
 
+### 1. Cambios en Código (Next.js & Refactoring)
+- **Migración de Consultas de Página a Acciones**:
+  - **Incidencias (`issues/page.tsx`)**: Reemplazadas las llamadas directas de lectura a `document_issues` y `project_members` por la Server Action `getIssuesPageDataAction(projectId)`.
+  - **Transmittals (`transmittals/page.tsx`)**: Reemplazados los accesos directos de lectura a `projects` y `transmittals` por la Server Action `getTransmittalsPageDataAction(projectId)`.
+  - **Layout del Proyecto (`layout.tsx`)**: Reemplazada la consulta directa a `projects` por la Server Action `getProjectLayoutDataAction(projectId)`.
+  - **Configuración del Proyecto (`settings/page.tsx`)**: Reemplazadas todas las consultas locales y verificación de roles/miembros por la Server Action `getProjectSettingsDataAction(projectId)`.
+- **Ajustes y Robustez en Server Actions (`mdl/actions.ts`)**:
+  - Corregido un typo de capitalización en un Booleano (`True` -> `true`).
+  - Añadido soporte en `getProjectSettingsDataAction` para obtener la información real del perfil de usuario (`organization_id` y `is_admin`) de manera directa de la tabla `users`, evitando problemas de permisos en el panel de clientes conectados.
+  - Ajustado el tipado de `revisions` en `getDocumentDetailAction` mediante un cast intermedio a `unknown` y uploader como `any`, para manejar de forma robusta la compatibilidad entre objetos y colecciones devueltas por Supabase en las relaciones Many-to-One.
+  - Importados los tipos TypeScript necesarios (`CustomPropertyDefinition`, `DocumentTableRow`).
+
+### 2. Cambios en Base de Datos (Supabase)
+- **Estado:** Sin modificaciones de esquema SQL en esta sesión.
+
+### 3. Plan de Control e Integridad
+- **Compilación de Producción**:
+  - Ejecutado `npm run build` con éxito total en Next.js (Turbopack), logrando compilar la aplicación completa sin advertencias ni fallos de tipado.
+- **Grafo de Conocimiento (Graphify)**:
+  - Ejecutado `graphify update .` para registrar el nuevo acoplamiento de dependencias estáticas en el mapa visual. Se observó una menor fragmentación de componentes e importaciones, consolidando el flujo de datos hacia `actions.ts`.
+
+
+## [2026-06-11] Sesión 16: Validación de Límites de Suscripción, Modo Read-Only y Registro de Gastos
+**Hora:** 21:12 (Local Time)  
+**Objetivo:** Implementar la validación del límite de proyectos activos y espacio en disco utilizado por organización, bloquear operaciones de modificación en caso de suscripción vencida (PAST_DUE), y registrar facturación en la tabla de gastos financieros.
+
+### 1. Cambios en Código (Next.js & Services)
+- **Servicio de Control de Límites (`limits.ts`)**:
+  - Creado [[limits.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/lib/services/limits.ts)] para encapsular las comprobaciones de estado `PAST_DUE`, límites de proyectos creados y espacio ocupado.
+  - Implementada `recordSubscriptionExpense` para insertar el historial financiero en `subscription_expenses`.
+- **Aseguramiento de Server Actions (Guards)**:
+  - **Proyectos**: Integradas las guardias en [[actions.ts (Projects)](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/actions.ts)] para validar el límite de proyectos y denegar mutaciones si la cuenta está en mora.
+  - **Documentos & Revisiones**: Modificados [[actions.ts (MDL)](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/[projectId]/mdl/actions.ts)] y [[revision-actions.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/[projectId]/mdl/revision-actions.ts)] para denegar la creación de documentos, generación de URL firmadas de subida, carga directa y registro si se superaría el almacenamiento asignado (e.g. 500 MB) o si se encuentra en mora.
+  - **Transmittals & Comentarios**: Protegida la creación formal de transmittals en [[actions.ts (Transmittals)](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/[projectId]/transmittals/actions.ts)] y comentarios en [[comment-actions.ts](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/projects/[projectId]/comment-actions.ts)].
+- **Banner UI en el Layout del Dashboard**:
+  - Modificado [[layout.tsx](file:///home/diegogto/Documents/Projects/Faberdoc/src/app/(dashboard)/layout.tsx)] para comprobar de manera eficiente el estado de la suscripción y mostrar una alerta global roja de sólo lectura en caso de suscripción en mora.
+
+### 2. Cambios en Base de Datos (Supabase)
+- **Función de Sumatorio de Almacenamiento**:
+  - Creada la función `get_organization_storage_used_bytes` en [[schema.sql](file:///home/diegogto/Documents/Projects/Faberdoc/supabase/schema.sql)] y cargada al motor Postgres usando `psql` para calcular mediante inner joins el espacio en disco que ocupan los archivos del cliente en el bucket de Faberdoc.
+
+### 3. Plan de Control e Integridad
+- **Compilación de Producción**:
+  - Compilado el proyecto con éxito total (`npm run build`) en Next.js (Turbopack) sin errores de tipado de TypeScript.
+- **Pruebas de Límites**:
+  - Creado y ejecutado [[test_limits_script.ts](file:///home/diegogto/.gemini/antigravity-ide/brain/7219a6fb-e910-4d9f-8784-4be7353a48e1/scratch/test_limits_script.ts)], pasando con éxito todas las aserciones de bloqueo por mora, desbordamiento de proyectos y almacenamiento.
+- **Grafo de Conocimiento (Graphify)**:
+  - Sincronizado el grafo visual del proyecto con 735 nodos y 1744 conexiones.
 

@@ -1,6 +1,6 @@
 import { TopBar } from "@/components/layout/top-bar";
-import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
+import { getProjectLayoutDataAction } from "./mdl/actions";
 
 interface ProjectLayoutProps {
   children: React.ReactNode;
@@ -12,18 +12,13 @@ export default async function ProjectLayout({
   params,
 }: ProjectLayoutProps) {
   const { projectId } = await params;
-  const supabase = await createClient();
 
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, name")
-    .eq("id", projectId)
-    .is("deleted_at", null)
-    .single();
-
-  if (!project) {
+  const res = await getProjectLayoutDataAction(projectId);
+  if (res.error || !res.project) {
     notFound();
   }
+
+  const project = res.project;
 
   return (
     <div className="flex flex-col h-full">

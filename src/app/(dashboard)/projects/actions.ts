@@ -2,6 +2,7 @@
 
 import { createClient, getRequestOrigin } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { checkPastDue, checkPastDueByProject, checkProjectLimit } from "@/lib/services/limits";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { sendEmail } from "@/lib/email";
@@ -76,6 +77,16 @@ export async function createProjectAction(formData: FormData) {
       return { error: "Solo los administradores de la organización pueden crear proyectos." };
     }
 
+    const pastDueCheck = await checkPastDue(userProfile.organization_id);
+    if (!pastDueCheck.allowed) {
+      return { error: pastDueCheck.error };
+    }
+
+    const limitCheck = await checkProjectLimit(userProfile.organization_id);
+    if (!limitCheck.allowed) {
+      return { error: limitCheck.error };
+    }
+
     // 4. Definir propiedades personalizadas por defecto para un nuevo proyecto (estilo Notion/MDL)
     const defaultProperties = [
       {
@@ -148,6 +159,11 @@ export async function updateProjectSettingsAction(projectId: string, formData: F
   const mode = formData.get("mode") as string; // 'general' | 'naming' or null
 
   try {
+    const pastDueCheck = await checkPastDueByProject(projectId);
+    if (!pastDueCheck.allowed) {
+      return { error: pastDueCheck.error };
+    }
+
     if (await checkIfProjectArchived(projectId, supabase)) {
       return { error: "Este proyecto está archivado y no puede ser modificado." };
     }
@@ -277,6 +293,11 @@ export async function assignProjectMemberAction(
   if (authError || !authUser) return { error: "No estás autenticado." };
 
   try {
+    const pastDueCheck = await checkPastDueByProject(projectId);
+    if (!pastDueCheck.allowed) {
+      return { error: pastDueCheck.error };
+    }
+
     if (await checkIfProjectArchived(projectId, supabase)) {
       return { error: "Este proyecto está archivado y no puede ser modificado." };
     }
@@ -379,6 +400,11 @@ export async function updateProjectAttributesAction(projectId: string, attribute
   if (authError || !authUser) return { error: "No autenticado." };
 
   try {
+    const pastDueCheck = await checkPastDueByProject(projectId);
+    if (!pastDueCheck.allowed) {
+      return { error: pastDueCheck.error };
+    }
+
     if (await checkIfProjectArchived(projectId, supabase)) {
       return { error: "Este proyecto está archivado y no puede ser modificado." };
     }
@@ -438,6 +464,11 @@ export async function removeProjectMemberAction(projectId: string, targetUserId:
   }
 
   try {
+    const pastDueCheck = await checkPastDueByProject(projectId);
+    if (!pastDueCheck.allowed) {
+      return { error: pastDueCheck.error };
+    }
+
     if (await checkIfProjectArchived(projectId, supabase)) {
       return { error: "Este proyecto está archivado y no puede ser modificado." };
     }
@@ -496,6 +527,11 @@ export async function saveReviewFlowAction(
   if (authError || !authUser) return { error: "No estás autenticado." };
 
   try {
+    const pastDueCheck = await checkPastDueByProject(projectId);
+    if (!pastDueCheck.allowed) {
+      return { error: pastDueCheck.error };
+    }
+
     if (await checkIfProjectArchived(projectId, supabase)) {
       return { error: "Este proyecto está archivado y no puede ser modificado." };
     }
@@ -546,6 +582,11 @@ export async function saveProjectFlowsAction(
   if (authError || !authUser) return { error: "No estás autenticado." };
 
   try {
+    const pastDueCheck = await checkPastDueByProject(projectId);
+    if (!pastDueCheck.allowed) {
+      return { error: pastDueCheck.error };
+    }
+
     if (await checkIfProjectArchived(projectId, supabase)) {
       return { error: "Este proyecto está archivado y no puede ser modificado." };
     }
@@ -590,6 +631,11 @@ export async function archiveProjectAction(projectId: string) {
   if (authError || !authUser) return { error: "No estás autenticado." };
 
   try {
+    const pastDueCheck = await checkPastDueByProject(projectId);
+    if (!pastDueCheck.allowed) {
+      return { error: pastDueCheck.error };
+    }
+
     const { data: userProfile } = await supabase
       .from("users")
       .select("is_admin")
@@ -640,6 +686,11 @@ export async function deleteProjectAction(projectId: string) {
   if (authError || !authUser) return { error: "No estás autenticado." };
 
   try {
+    const pastDueCheck = await checkPastDueByProject(projectId);
+    if (!pastDueCheck.allowed) {
+      return { error: pastDueCheck.error };
+    }
+
     const { data: userProfile } = await supabase
       .from("users")
       .select("is_admin, organization_id")
@@ -783,6 +834,11 @@ export async function restoreProjectAction(projectId: string) {
   if (authError || !authUser) return { error: "No estás autenticado." };
 
   try {
+    const pastDueCheck = await checkPastDueByProject(projectId);
+    if (!pastDueCheck.allowed) {
+      return { error: pastDueCheck.error };
+    }
+
     const { data: userProfile } = await supabase
       .from("users")
       .select("is_admin, organization_id")

@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState, useTransition, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { getProjectFlowsAction } from "@/app/(dashboard)/projects/[projectId]/mdl/actions";
 import { cn } from "@/lib/utils";
+
 import {
   Sheet,
   SheetContent,
@@ -27,10 +28,14 @@ import {
   createNextRevisionAction,
   uploadRevisionFileAction,
   updateRevisionStatusAction,
-  addCommentToRevisionAction,
+  addIssueToRevisionAction,
   getSignedUploadUrlAction,
   registerUploadedFileAction,
 } from "@/app/(dashboard)/projects/[projectId]/mdl/revision-actions";
+import {
+  addCommentAction,
+  getCommentsAction,
+} from "@/app/(dashboard)/projects/[projectId]/comment-actions";
 import {
   Upload,
   CheckCircle,
@@ -48,8 +53,9 @@ import {
   RefreshCw,
   Archive,
   Trash2,
+  CornerDownRight,
 } from "lucide-react";
-import type { DocumentDetail, RevisionStatus } from "@/lib/types";
+import type { DocumentDetail, RevisionStatus, SystemComment } from "@/lib/types";
 
 type ProjectRole = "ADMIN" | "COORDINATOR" | "REVIEWER" | "OWNER_APPROVER" | "VIEWER" | "UPLOADER";
 
@@ -123,27 +129,72 @@ export function DocumentDrawer({
   const [isPending, startTransition] = useTransition();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Resize states
+  // Resize y Pestañas
   const [width, setWidth] = useState(550);
   const [isResizing, setIsResizing] = useState(false);
   const [flows, setFlows] = useState<any[]>([]);
   const [pendingUploadAction, setPendingUploadAction] = useState<"resolved" | "rereview" | null>(null);
+  
+  const [activeTab, setActiveTab] = useState<"history" | "conversations">("history");
+  const [systemComments, setSystemComments] = useState<SystemComment[]>([]);
+  const [newCommentText, setNewCommentText] = useState("");
+  const [replyToId, setReplyToId] = useState<string | null>(null);
+
+  const fetchComments = async () => {
+    if (!documentDetail) return;
+    const res = await getCommentsAction(projectId, {
+      targetType: "document",
+      targetId: documentDetail.document.id,
+    });
+    if (res.success && res.comments) {
+      const mapped = (res.comments || []).map((c: any) => ({
+        id: c.id,
+        parent_id: c.parent_id,
+        author_id: c.author_id,
+        content: c.content,
+        created_at: c.created_at,
+        project_id: c.project_id || null,
+        document_id: c.document_id || null,
+        transmittal_id: c.transmittal_id || null,
+        author: Array.isArray(c.author)
+          ? c.author[0]
+            ? {
+                full_name: c.author[0].full_name,
+                avatar_url: c.author[0].avatar_url,
+              }
+            : undefined
+          : c.author
+          ? {
+              full_name: c.author.full_name,
+              avatar_url: c.author.avatar_url,
+            }
+          : undefined,
+      })) as SystemComment[];
+      setSystemComments(mapped);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && documentDetail) {
+      fetchComments();
+      setActiveTab("history");
+    }
+  }, [isOpen, documentDetail]);
 
   // Cargar flujos de revisión del proyecto al abrir el drawer
   useEffect(() => {
     if (!isOpen || !projectId) return;
     const fetchProjectFlows = async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("projects")
-        .select("review_flow_config")
-        .eq("id", projectId)
-        .single();
-      const projectFlows = (data?.review_flow_config as any)?.flows || [];
-      setFlows(projectFlows);
+      const res = await getProjectFlowsAction(projectId);
+      if (res.success && res.flows) {
+        setFlows(res.flows);
+      } else {
+        console.error("Error loading project flows:", res.error);
+      }
     };
     fetchProjectFlows();
   }, [isOpen, projectId]);
+
 
   // Load width on mount (prevents Next.js SSR hydration mismatch)
   useEffect(() => {
@@ -314,16 +365,36 @@ export function DocumentDrawer({
     });
   };
 
-  const handleAddComment = () => {
+  const handleAddIssue = () => {
     if (!latestRevision || !commentText.trim()) return;
     setErrorMsg(null);
     startTransition(async () => {
-      const res = await addCommentToRevisionAction(projectId, latestRevision.id, commentText);
+      const res = await addIssueToRevisionAction(projectId, latestRevision.id, commentText);
       if (res.error) {
         setErrorMsg(res.error);
       } else {
         setCommentText("");
         onRefresh?.();
+      }
+    });
+  };
+
+  const handleAddSystemComment = async (parentId?: string | null) => {
+    if (!documentDetail || !newCommentText.trim()) return;
+    setErrorMsg(null);
+    startTransition(async () => {
+      const res = await addCommentAction(projectId, {
+        targetType: "document",
+        targetId: documentDetail.document.id,
+        content: newCommentText,
+        parentId: parentId || null,
+      });
+      if (res.error) {
+        setErrorMsg(res.error);
+      } else {
+        setNewCommentText("");
+        setReplyToId(null);
+        fetchComments();
       }
     });
   };
@@ -367,7 +438,33 @@ export function DocumentDrawer({
               </div>
             </SheetHeader>
 
-            <Separator />
+            {/* Tabs */}
+            <div className="px-6 border-b border-zinc-200 dark:border-zinc-800 flex gap-4 bg-zinc-50/50 dark:bg-zinc-900/10 shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveTab("history")}
+                className={cn(
+                  "py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer outline-hidden",
+                  activeTab === "history"
+                    ? "border-[#2e3e56] dark:border-[#3e689a] text-[#2e3e56] dark:text-[#a0b3cf]"
+                    : "border-transparent text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-400"
+                )}
+              >
+                Historial e Incidencias
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("conversations")}
+                className={cn(
+                  "py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer outline-hidden",
+                  activeTab === "conversations"
+                    ? "border-[#2e3e56] dark:border-[#3e689a] text-[#2e3e56] dark:text-[#a0b3cf]"
+                    : "border-transparent text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-400"
+                )}
+              >
+                Conversaciones
+              </button>
+            </div>
 
             {/* Error Message */}
             {errorMsg && (
@@ -487,7 +584,7 @@ export function DocumentDrawer({
                   </div>
                 )}
 
-                {!isProjectArchived ? (
+                {activeTab === "history" ? (
                   <>
                     <Separator />
 
@@ -701,16 +798,16 @@ export function DocumentDrawer({
                 <Separator />
 
                     {/* Add Comment Section: Visible if there is a revision */}
-                    {latestRevision && (
+                    {latestRevision && !isProjectArchived && (
                       <section className="space-y-3">
                         <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                          Agregar Comentario Técnico
+                          Registrar Incidencia de Revisión
                         </h3>
                         <div className="flex flex-col gap-2">
                           <textarea
                             value={commentText}
                             onChange={(e) => setCommentText(e.target.value)}
-                            placeholder="Escribe un comentario o aclaración técnica..."
+                            placeholder="Escribe una observación o incidencia técnica que requiera corrección..."
                             rows={2}
                             disabled={isPending}
                             className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-950"
@@ -718,35 +815,154 @@ export function DocumentDrawer({
                           <div className="flex justify-end">
                             <Button
                               size="sm"
-                              className="gap-1.5 font-medium text-xs h-8 cursor-pointer"
-                              onClick={handleAddComment}
+                              className="gap-1.5 font-medium text-xs h-8 cursor-pointer bg-[#2e3e56] hover:bg-[#3e689a] text-white"
+                              onClick={handleAddIssue}
                               disabled={isPending || !commentText.trim()}
                             >
                               <MessageSquare className="h-3.5 w-3.5" />
-                              Comentar
+                              Registrar Incidencia
                             </Button>
                           </div>
                         </div>
                       </section>
                     )}
+
+                    {/* Timeline */}
+                    <section>
+                      <RevisionTimeline
+                        revisions={documentDetail.revisions}
+                        projectId={projectId}
+                        onRefresh={onRefresh}
+                        isProjectArchived={isProjectArchived}
+                        canAccessArchivedIntermediate={canAccessArchivedIntermediate}
+                      />
+                    </section>
                   </>
-                ) : null}
+                ) : (
+                  <div className="space-y-4 pt-2">
+                    {/* Chat / Conversations Tab */}
+                    <section className="space-y-3">
+                      {/* Comments list */}
+                      <div className="space-y-3">
+                        {systemComments.length === 0 ? (
+                          <p className="text-xs text-zinc-400 dark:text-zinc-500 italic py-4 text-center">
+                            No hay conversaciones iniciadas sobre este documento. Usa el formulario de abajo para enviar un mensaje al equipo.
+                          </p>
+                        ) : (
+                          (() => {
+                            const roots = systemComments.filter(c => !c.parent_id);
+                            const replies = systemComments.reduce<Record<string, SystemComment[]>>((acc, c) => {
+                              if (c.parent_id) {
+                                if (!acc[c.parent_id]) acc[c.parent_id] = [];
+                                acc[c.parent_id].push(c);
+                              }
+                              return acc;
+                            }, {});
 
-                <Separator />
+                            return roots.map((comment) => (
+                              <div key={comment.id} className="space-y-2">
+                                {/* Root Comment */}
+                                <div className="rounded-lg border border-zinc-200/80 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-900/10 p-3 space-y-1.5">
+                                  <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                                    <span className="font-semibold text-zinc-700 dark:text-zinc-300">
+                                      {comment.author?.full_name ?? "Usuario"}
+                                    </span>
+                                    <span suppressHydrationWarning>
+                                      {formatDate(comment.created_at)}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-normal">
+                                    {comment.content}
+                                  </p>
+                                  {!isProjectArchived && (
+                                    <div className="flex justify-end pt-1">
+                                      <button
+                                        onClick={() => setReplyToId(replyToId === comment.id ? null : comment.id)}
+                                        className="text-[10px] text-primary hover:underline font-medium cursor-pointer"
+                                      >
+                                        Responder
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
 
-                {/* Revision History Section */}
-                <section>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-4">
-                    Historial de Revisiones
-                  </h3>
-                  <RevisionTimeline
-                    revisions={documentDetail.revisions}
-                    projectId={projectId}
-                    onRefresh={onRefresh}
-                    isProjectArchived={isProjectArchived}
-                    canAccessArchivedIntermediate={canAccessArchivedIntermediate}
-                  />
-                </section>
+                                {/* Replies */}
+                                {replies[comment.id]?.map((reply) => (
+                                  <div key={reply.id} className="flex gap-2 pl-6">
+                                    <CornerDownRight className="h-4 w-4 text-zinc-300 shrink-0 mt-2" />
+                                    <div className="flex-1 rounded-lg border border-zinc-100 dark:border-zinc-900 bg-white dark:bg-zinc-950 p-2.5 space-y-1.5">
+                                      <div className="flex items-center justify-between text-[10px] text-zinc-400">
+                                        <span className="font-semibold text-zinc-600 dark:text-zinc-400">
+                                          {reply.author?.full_name ?? "Usuario"}
+                                        </span>
+                                        <span suppressHydrationWarning>
+                                          {formatDate(reply.created_at)}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-normal">
+                                        {reply.content}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+
+                                {/* Cascading Reply Input */}
+                                {replyToId === comment.id && (
+                                  <div className="pl-6 flex gap-2">
+                                    <CornerDownRight className="h-4 w-4 text-zinc-300 shrink-0 mt-2" />
+                                    <div className="flex-1 flex gap-2 items-center">
+                                      <input
+                                        type="text"
+                                        placeholder="Escribe una respuesta..."
+                                        value={newCommentText}
+                                        onChange={(e) => setNewCommentText(e.target.value)}
+                                        className="flex-1 text-xs px-3 py-1.5 rounded-md border border-input bg-transparent shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring dark:bg-zinc-950"
+                                      />
+                                      <Button
+                                        size="sm"
+                                        className="h-8 text-xs cursor-pointer"
+                                        onClick={() => handleAddSystemComment(comment.id)}
+                                        disabled={isPending || !newCommentText.trim()}
+                                      >
+                                        Enviar
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ));
+                          })()
+                        )}
+                      </div>
+
+                      {/* Main system comment input */}
+                      {!isProjectArchived && !replyToId && (
+                        <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-zinc-150 dark:border-zinc-800">
+                          <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                            Iniciar Conversación
+                          </h4>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="Escribe un mensaje para el equipo..."
+                              value={newCommentText}
+                              onChange={(e) => setNewCommentText(e.target.value)}
+                              className="flex-1 text-xs px-3 py-2 rounded-md border border-input bg-transparent shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring dark:bg-zinc-950"
+                            />
+                            <Button
+                              size="sm"
+                              className="h-9 cursor-pointer"
+                              onClick={() => handleAddSystemComment(null)}
+                              disabled={isPending || !newCommentText.trim()}
+                            >
+                              Enviar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </section>
+                  </div>
+                )}
               </div>
             </ScrollArea>
           </>

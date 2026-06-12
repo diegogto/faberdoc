@@ -5,6 +5,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { checkIfProjectArchived } from "@/app/(dashboard)/projects/actions";
+import { checkPastDueByProject } from "@/lib/services/limits";
+import type { CustomPropertyDefinition, DocumentTableRow } from "@/lib/types";
 
 // Validaciones
 const documentSchema = z.object({
@@ -108,6 +110,44 @@ async function verifyUserProjectAccess(projectId: string) {
 }
 
 /**
+ * Verifica si el usuario tiene permisos de lectura en el proyecto (cualquier rol o admin)
+ */
+async function verifyUserProjectReadAccess(projectId: string) {
+  const userSupabase = await createClient();
+  const { data: { user }, error: authError } = await userSupabase.auth.getUser();
+
+  if (authError || !user) {
+    return { error: "No estás autenticado.", user: null, isOrgAdmin: false, role: null };
+  }
+
+  // Verificar si es miembro del proyecto
+  const { data: member, error: memberError } = await userSupabase
+    .from("project_members")
+    .select("role")
+    .eq("project_id", projectId)
+    .eq("user_id", user.id)
+    .single();
+
+  // Verificar si es administrador de la organización
+  const { data: profile } = await userSupabase
+    .from("users")
+    .select("is_admin")
+    .eq("id", user.id)
+    .single();
+  const isOrgAdmin = profile?.is_admin === true;
+
+  if (memberError || !member) {
+    if (isOrgAdmin) {
+      return { user, error: null, isOrgAdmin: true, role: "ADMIN" };
+    }
+    return { error: "No tienes acceso a este proyecto.", user: null, isOrgAdmin: false, role: null };
+  }
+
+  return { user, error: null, isOrgAdmin, role: member.role };
+}
+
+
+/**
  * Crea un único documento en la MDL con su revisión e issuance log de planificación.
  */
 export async function createDocumentAction(
@@ -117,6 +157,11 @@ export async function createDocumentAction(
   const access = await verifyUserProjectAccess(projectId);
   if (access.error || !access.user) {
     return { error: access.error };
+  }
+
+  const pastDueCheck = await checkPastDueByProject(projectId);
+  if (!pastDueCheck.allowed) {
+    return { error: pastDueCheck.error };
   }
 
   const validation = documentSchema.safeParse(rawData);
@@ -238,6 +283,11 @@ export async function bulkImportDocumentsAction(
   const access = await verifyUserProjectAccess(projectId);
   if (access.error || !access.user) {
     return { error: access.error };
+  }
+
+  const pastDueCheck = await checkPastDueByProject(projectId);
+  if (!pastDueCheck.allowed) {
+    return { error: pastDueCheck.error };
   }
 
   if (!documents || documents.length === 0) {
@@ -365,6 +415,11 @@ export async function deleteDocumentAction(projectId: string, documentId: string
     return { error: access.error };
   }
 
+  const pastDueCheck = await checkPastDueByProject(projectId);
+  if (!pastDueCheck.allowed) {
+    return { error: pastDueCheck.error };
+  }
+
   const adminSupabase = createAdminClient();
 
   try {
@@ -385,4 +440,609 @@ export async function deleteDocumentAction(projectId: string, documentId: string
     return { error: "Error inesperado al eliminar el documento." };
   }
 }
+
+/**
+ * Obtiene el detalle completo de un documento
+ */
+export async function getDocumentDetailAction(projectId: string, documentId: string) {
+  const access = await verifyUserProjectReadAccess(projectId);
+  if (access.error || !access.user) {
+    return { error: access.error };
+  }
+
+  const userSupabase = await createClient();
+
+  try {
+    const { data: doc, error } = await userSupabase
+      .from("documents")
+      .select(
+        `
+        id,
+        project_id,
+        document_code,
+        title,
+        custom_properties,
+        created_at,
+        deleted_at,
+        revisions (
+          id,
+          document_id,
+          uploader_id,
+          version_label,
+          version_index,
+          status,
+          created_at,
+          uploader:users!uploader_id ( full_name ),
+          files ( id, revision_id, s3_key, file_name, file_size_bytes, created_at ),
+          document_issues ( id, revision_id, author_id, content, status, response_text, closed_at, created_at ),
+          issuance_logs ( id, revision_id, original_planned_date, current_planned_date, actual_issuance_date, iteration_count, created_at )
+        )
+      `
+      )
+      .eq("id", documentId)
+      .single();
+
+    if (error || !doc) {
+      return { error: error?.message || "No se pudo obtener el detalle del documento." };
+    }
+
+    const revisions = (doc.revisions as unknown as Array<{
+      id: string;
+      document_id: string;
+      uploader_id: string;
+      version_label: string;
+      version_index: number;
+      status: string;
+      created_at: string;
+      uploader: any;
+      files: Array<{
+        id: string;
+        revision_id: string;
+        s3_key: string;
+        file_name: string;
+        file_size_bytes: number;
+        created_at: string;
+      }>;
+      document_issues: Array<{
+        id: string;
+        revision_id: string;
+        author_id: string;
+        content: string;
+        status: string;
+        response_text: string | null;
+        closed_at: string | null;
+        created_at: string;
+      }>;
+      issuance_logs: Array<{
+        id: string;
+        revision_id: string;
+        original_planned_date: string;
+        current_planned_date: string;
+        actual_issuance_date: string | null;
+        iteration_count: number;
+        created_at: string;
+      }>;
+    }>) ?? [];
+
+    revisions.sort((a, b) => b.version_index - a.version_index);
+    const latestIssuance = revisions[0]?.issuance_logs?.[0] ?? null;
+
+    const detail = {
+      document: {
+        id: doc.id,
+        project_id: doc.project_id,
+        document_code: doc.document_code,
+        title: doc.title,
+        custom_properties: doc.custom_properties,
+        created_at: doc.created_at,
+        deleted_at: doc.deleted_at,
+      },
+      revisions: revisions.map((rev) => ({
+        id: rev.id,
+        document_id: rev.document_id,
+        uploader_id: rev.uploader_id,
+        version_label: rev.version_label,
+        version_index: rev.version_index,
+        status: rev.status as "DRAFT" | "IN_REVIEW" | "COMMENTED" | "APPROVED" | "ISSUED",
+        created_at: rev.created_at,
+        uploader_name: (Array.isArray(rev.uploader)
+          ? rev.uploader[0]?.full_name
+          : rev.uploader?.full_name) ?? "Desconocido",
+        files: rev.files ?? [],
+        issues: (rev.document_issues ?? []).map((c) => ({
+          id: c.id,
+          revision_id: c.revision_id,
+          author_id: c.author_id,
+          content: c.content,
+          status: c.status as "OPEN" | "RESOLVED" | "CLOSED",
+          response_text: c.response_text,
+          closed_at: c.closed_at,
+          created_at: c.created_at,
+        })),
+      })),
+      issuance: latestIssuance ? {
+        id: latestIssuance.id,
+        revision_id: latestIssuance.revision_id,
+        original_planned_date: latestIssuance.original_planned_date,
+        current_planned_date: latestIssuance.current_planned_date,
+        actual_issuance_date: latestIssuance.actual_issuance_date,
+        iteration_count: latestIssuance.iteration_count,
+        created_at: latestIssuance.created_at,
+      } : null,
+    };
+
+    return { success: true, detail };
+  } catch (err) {
+    console.error("Excepción en obtener detalle del documento:", err);
+    return { error: "Ocurrió un error inesperado al obtener los detalles del documento." };
+  }
+}
+
+/**
+ * Obtiene los flujos de revisión configurados en el proyecto
+ */
+export async function getProjectFlowsAction(projectId: string) {
+  const access = await verifyUserProjectReadAccess(projectId);
+  if (access.error || !access.user) {
+    return { error: access.error };
+  }
+
+  const userSupabase = await createClient();
+
+  try {
+    const { data, error } = await userSupabase
+      .from("projects")
+      .select("review_flow_config")
+      .eq("id", projectId)
+      .single();
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    const projectFlows = (data?.review_flow_config as any)?.flows || [];
+    return { success: true, flows: projectFlows };
+  } catch (err) {
+    console.error("Excepción en obtener flujos de revisión del proyecto:", err);
+    return { error: "Ocurrió un error inesperado al obtener los flujos de revisión." };
+  }
+}
+
+/**
+ * Obtiene todos los datos para la página principal del Maestro de Documentos (MDL)
+ */
+export async function getMDLPageDataAction(projectId: string) {
+  const access = await verifyUserProjectReadAccess(projectId);
+  if (access.error || !access.user) {
+    return { error: access.error };
+  }
+
+  const userSupabase = await createClient();
+
+  try {
+    // 1. Obtener información de configuración del proyecto
+    const { data: project, error: projError } = await userSupabase
+      .from("projects")
+      .select("name, naming_pattern, custom_properties_definition, archived_at")
+      .eq("id", projectId)
+      .is("deleted_at", null)
+      .single();
+
+    if (projError || !project) {
+      return { error: "No se pudo encontrar el proyecto especificado." };
+    }
+
+    const customPropertiesDef =
+      (project.custom_properties_definition as unknown as CustomPropertyDefinition[]) ?? [];
+    const namingPattern = project.naming_pattern ?? "{PROY}-{ESP}-{NUM}";
+    const projectName = project.name ?? "";
+    const isProjectArchived = !!project.archived_at;
+    const canAccessArchivedIntermediate =
+      access.isOrgAdmin || access.role === "ADMIN" || access.role === "COORDINATOR";
+
+    // 2. Obtener documentos del proyecto con su última revisión, files e issuance
+    const { data: rawDocuments, error: docsError } = await userSupabase
+      .from("documents")
+      .select(
+        `
+        id,
+        document_code,
+        title,
+        custom_properties,
+        revisions (
+          id,
+          version_label,
+          version_index,
+          status,
+          current_flow_id,
+          active_nodes,
+          files ( id ),
+          issuance_logs (
+            current_planned_date,
+            actual_issuance_date
+          )
+        )
+      `
+      )
+      .eq("project_id", projectId)
+      .is("deleted_at", null)
+      .order("document_code", { ascending: true });
+
+    if (docsError) {
+      return { error: docsError.message };
+    }
+
+    // 3. Transformar a DocumentTableRow
+    const documents: DocumentTableRow[] = (rawDocuments ?? []).map((doc) => {
+      const revisions = (doc.revisions as Array<{
+        id: string;
+        version_label: string;
+        version_index: number;
+        status: string;
+        current_flow_id: string | null;
+        active_nodes: any[] | null;
+        files: Array<{ id: string }>;
+        issuance_logs: Array<{
+          current_planned_date: string;
+          actual_issuance_date: string | null;
+        }>;
+      }>) ?? [];
+
+      const latestRevision = revisions.sort(
+        (a, b) => b.version_index - a.version_index
+      )[0];
+
+      const issuance = latestRevision?.issuance_logs?.[0] ?? null;
+      const customProps = doc.custom_properties as Record<string, string | number> | null;
+      const hasFiles = (latestRevision?.files?.length ?? 0) > 0;
+
+      const dynamicProps: Record<string, unknown> = {};
+      for (const prop of customPropertiesDef) {
+        dynamicProps[prop.key] = customProps?.[prop.key] ?? "—";
+      }
+
+      return {
+        id: doc.id,
+        document_code: doc.document_code,
+        title: doc.title,
+        latest_revision: hasFiles ? (latestRevision?.version_label ?? "—") : "—",
+        status: hasFiles
+          ? ((latestRevision?.status ?? "DRAFT") as DocumentTableRow["status"])
+          : null,
+        planned_date: issuance?.current_planned_date ?? null,
+        actual_date: issuance?.actual_issuance_date ?? null,
+        has_files: hasFiles,
+        current_flow_id: latestRevision?.current_flow_id ?? null,
+        active_nodes: latestRevision?.active_nodes ?? [],
+        ...dynamicProps,
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        documents,
+        customPropertiesDef,
+        namingPattern,
+        projectName,
+        isProjectArchived,
+        canAccessArchivedIntermediate,
+        userRole: access.role as any,
+        currentUserId: access.user.id,
+      },
+    };
+  } catch (err) {
+    console.error("Excepción en getMDLPageDataAction:", err);
+    return { error: "Ocurrió un error inesperado al cargar los datos del Maestro de Documentos." };
+  }
+}
+
+/**
+ * Obtiene las incidencias y datos necesarios para la página de Incidencias
+ */
+export async function getIssuesPageDataAction(projectId: string) {
+  let access = await verifyUserProjectReadAccess(projectId);
+  const userSupabase = await createClient();
+
+  if (access.error || !access.user) {
+    const { data: { user } } = await userSupabase.auth.getUser();
+    if (user) {
+      const { data: userProfile } = await userSupabase
+        .from("users")
+        .select("is_admin")
+        .eq("id", user.id)
+        .single();
+      if (userProfile?.is_admin) {
+        access = { user, error: null, isOrgAdmin: true, role: "ORGANIZATION_ADMIN" as any };
+      } else {
+        return { error: "No tienes acceso a este proyecto." };
+      }
+    } else {
+      return { error: "No estás autenticado." };
+    }
+  }
+
+  const user = access.user;
+  if (!user) return { error: "No estás autenticado." };
+  const userRole = access.role || "VIEWER";
+
+  try {
+    const { data: issuesData, error } = await userSupabase
+      .from("document_issues")
+      .select(`
+        id,
+        revision_id,
+        author_id,
+        content,
+        status,
+        response_text,
+        closed_at,
+        created_at,
+        author:users(full_name),
+        revision:revisions!inner(
+          id,
+          version_label,
+          document:documents!inner(
+            id,
+            document_code,
+            title,
+            project_id
+          )
+        )
+      `)
+      .eq("revisions.document.project_id", projectId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    const issues = (issuesData || []).map((issue: any) => {
+      const rev = issue.revision;
+      const doc = rev?.document;
+      return {
+        id: issue.id,
+        revision_id: issue.revision_id,
+        author_id: issue.author_id,
+        content: issue.content,
+        status: issue.status as "OPEN" | "RESOLVED" | "CLOSED",
+        response_text: issue.response_text,
+        closed_at: issue.closed_at,
+        created_at: issue.created_at,
+        author_name: issue.author?.full_name || "Desconocido",
+        version_label: rev?.version_label || "",
+        document_id: doc?.id || "",
+        document_code: doc?.document_code || "",
+        document_title: doc?.title || "",
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        issues,
+        userRole: userRole as any,
+      },
+    };
+  } catch (err) {
+    console.error("Excepción en getIssuesPageDataAction:", err);
+    return { error: "Error inesperado al cargar las incidencias." };
+  }
+}
+
+/**
+ * Obtiene transmittals y configuración para la página de Transmittals
+ */
+export async function getTransmittalsPageDataAction(projectId: string) {
+  const access = await verifyUserProjectReadAccess(projectId);
+  if (access.error || !access.user) {
+    return { error: access.error };
+  }
+
+  const userSupabase = await createClient();
+
+  try {
+    const { data: project, error: projError } = await userSupabase
+      .from("projects")
+      .select("versioning_logic")
+      .eq("id", projectId)
+      .single();
+
+    if (projError || !project) {
+      return { error: "No se pudo obtener la configuración del proyecto." };
+    }
+
+    const versioningLogic = project.versioning_logic ?? "MIXED";
+
+    const { data: rawTransmittals, error: transError } = await userSupabase
+      .from("transmittals")
+      .select(
+        `
+        id,
+        transmittal_code,
+        created_at,
+        sender:users!sender_id ( full_name ),
+        recipient:organizations!recipient_org_id ( name ),
+        transmittal_items ( id )
+      `
+      )
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+
+    if (transError) {
+      return { error: transError.message };
+    }
+
+    const transmittals = (rawTransmittals ?? []).map((row) => {
+      const sender = row.sender as unknown as { full_name: string } | null;
+      const recipient = row.recipient as unknown as { name: string } | null;
+      const items = row.transmittal_items as Array<{ id: string }> | null;
+
+      return {
+        id: row.id,
+        transmittal_code: row.transmittal_code,
+        recipient_name: recipient?.name ?? "Desconocido",
+        document_count: items?.length ?? 0,
+        created_at: row.created_at,
+        sender_name: sender?.full_name ?? "Desconocido",
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        transmittals,
+        versioningLogic,
+      },
+    };
+  } catch (err) {
+    console.error("Excepción en getTransmittalsPageDataAction:", err);
+    return { error: "Error inesperado al obtener los transmittals." };
+  }
+}
+
+/**
+ * Obtiene miembros, configuraciones y flujos para la página de Configuración
+ */
+export async function getProjectSettingsDataAction(projectId: string) {
+  const access = await verifyUserProjectReadAccess(projectId);
+  if (access.error || !access.user) {
+    return { error: access.error };
+  }
+
+  const userSupabase = await createClient();
+
+  try {
+    const { data: project, error: projError } = await userSupabase
+      .from("projects")
+      .select(
+        "id, name, naming_pattern, versioning_logic, review_flow_config, custom_properties_definition, organization_id, description, location, location_details, client_name, versioning_format_config, archived_at"
+      )
+      .eq("id", projectId)
+      .is("deleted_at", null)
+      .single();
+
+    if (projError || !project) {
+      return { error: "Proyecto no encontrado." };
+    }
+
+    const { data: currentUserProfile } = await userSupabase
+      .from("users")
+      .select("organization_id, is_admin")
+      .eq("id", access.user.id)
+      .single();
+
+    const isCurrentUserAdmin = currentUserProfile?.is_admin === true;
+    const currentUserOrgId = currentUserProfile?.organization_id || null;
+
+    const { data: rawMembers, error: membersError } = await userSupabase
+      .from("project_members")
+      .select("user_id, role, users(full_name, email, organization_id)")
+      .eq("project_id", projectId);
+
+    if (membersError) {
+      return { error: membersError.message };
+    }
+
+    const members = (rawMembers ?? []).map((m: any) => ({
+      user_id: m.user_id,
+      role: m.role as "ADMIN" | "COORDINATOR" | "REVIEWER" | "OWNER_APPROVER" | "VIEWER",
+      full_name: m.users?.full_name ?? "Sin nombre",
+      email: m.users?.email ?? null,
+      organization_id: m.users?.organization_id ?? null,
+    }));
+
+    const orgId = project.organization_id;
+    let orgMembers: Array<{ id: string; full_name: string; email: string | null }> = [];
+
+    if (orgId && isCurrentUserAdmin) {
+      const { data: rawOrgMembers } = await userSupabase
+        .from("users")
+        .select("id, full_name, email")
+        .eq("organization_id", orgId);
+      orgMembers = rawOrgMembers ?? [];
+    }
+
+    const customProperties = (project.custom_properties_definition as unknown as Array<{
+      key: string;
+      label: string;
+      type: string;
+      options?: string[];
+    }>) ?? [];
+
+    const reviewerRoles = ["REVIEWER", "OWNER_APPROVER", "COORDINATOR", "ADMIN"];
+    const flowReviewers = members
+      .filter((m) => reviewerRoles.includes(m.role))
+      .map((m) => ({ userId: m.user_id, userName: m.full_name, userEmail: m.email }));
+
+    let existingFlows = null;
+    if (project.review_flow_config && typeof project.review_flow_config === "object") {
+      const configObj = project.review_flow_config as any;
+      if (Array.isArray(configObj.flows)) {
+        existingFlows = configObj.flows;
+      } else if (Array.isArray(configObj.nodes)) {
+        existingFlows = [
+          {
+            id: "default-flow",
+            name: "Flujo de Aprobación Estándar",
+            isDefault: true,
+            conditions: [],
+            nodes: configObj.nodes,
+            edges: configObj.edges,
+          },
+        ];
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        project,
+        currentUserId: access.user.id,
+        currentUserOrgId,
+        isCurrentUserAdmin,
+        members,
+        orgMembers,
+        customProperties,
+        flowReviewers,
+        existingFlows,
+      },
+    };
+  } catch (err) {
+    console.error("Excepción en getProjectSettingsDataAction:", err);
+    return { error: "Ocurrió un error inesperado al cargar la configuración." };
+  }
+}
+
+/**
+ * Obtiene información básica del proyecto para el Layout
+ */
+export async function getProjectLayoutDataAction(projectId: string) {
+  const access = await verifyUserProjectReadAccess(projectId);
+  if (access.error || !access.user) {
+    return { error: access.error };
+  }
+
+  const userSupabase = await createClient();
+
+  try {
+    const { data: project, error } = await userSupabase
+      .from("projects")
+      .select("id, name")
+      .eq("id", projectId)
+      .is("deleted_at", null)
+      .single();
+
+    if (error || !project) {
+      return { error: error?.message || "Proyecto no encontrado." };
+    }
+
+    return { success: true, project };
+  } catch (err) {
+    console.error("Excepción en getProjectLayoutDataAction:", err);
+    return { error: "Error inesperado al cargar el layout del proyecto." };
+  }
+}
+
+
 

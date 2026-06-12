@@ -4,14 +4,14 @@ import { useState, useTransition } from "react";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { FileText, MessageSquare, Download, User, Check, Lock, Link, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { respondToCommentAction, getDownloadUrlAction } from "@/app/(dashboard)/projects/[projectId]/mdl/revision-actions";
-import type { Revision, FileRecord, Comment } from "@/lib/types";
+import { respondToIssueAction, getDownloadUrlAction } from "@/app/(dashboard)/projects/[projectId]/mdl/revision-actions";
+import type { Revision, FileRecord, DocumentIssue } from "@/lib/types";
 
 interface RevisionTimelineProps {
   revisions: (Revision & {
     files: FileRecord[];
     uploader_name: string;
-    comments: Comment[];
+    issues: DocumentIssue[];
   })[];
   projectId?: string;
   onRefresh?: () => void;
@@ -67,7 +67,7 @@ export function RevisionTimeline({
     if (!projectId || !responseText.trim()) return;
 
     startTransition(async () => {
-      const res = await respondToCommentAction(projectId, commentId, responseText, closeComment);
+      const res = await respondToIssueAction(projectId, commentId, responseText, closeComment);
       if (!res.error) {
         setResponseText("");
         setActiveCommentId(null);
@@ -80,7 +80,7 @@ export function RevisionTimeline({
     if (!projectId) return;
 
     startTransition(async () => {
-      const res = await respondToCommentAction(projectId, commentId, "", true);
+      const res = await respondToIssueAction(projectId, commentId, "", true);
       if (!res.error) {
         onRefresh?.();
       }
@@ -260,44 +260,44 @@ export function RevisionTimeline({
                 </div>
               )}
 
-              {/* Comments */}
-              {revision.comments.length > 0 && (
+              {/* Incidencias */}
+              {revision.issues.length > 0 && (
                 <div className="space-y-2 mt-3">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500">
                     <MessageSquare className="h-3 w-3" />
-                    {revision.comments.length} comentario
-                    {revision.comments.length !== 1 ? "s" : ""}
+                    {revision.issues.length} incidencia
+                    {revision.issues.length !== 1 ? "s" : ""}
                   </div>
-                  {revision.comments.map((comment) => (
+                  {revision.issues.map((issue) => (
                     <div
-                      key={comment.id}
+                      key={issue.id}
                       className="rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/40 p-3 space-y-2"
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-zinc-400" suppressHydrationWarning>
-                          {formatDate(comment.created_at)}
+                          {formatDate(issue.created_at)}
                         </span>
-                        <StatusBadge status={comment.status} />
+                        <StatusBadge status={issue.status} />
                       </div>
                       <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed font-sans">
-                        {comment.content}
+                        {issue.content}
                       </p>
                       
-                      {comment.response_text && (
+                      {issue.response_text && (
                         <div className="border-l-2 border-primary/30 pl-3 mt-2">
                           <p className="text-xs text-zinc-400 mb-0.5">
                             Respuesta:
                           </p>
                           <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                            {comment.response_text}
+                            {issue.response_text}
                           </p>
                         </div>
                       )}
-
-                      {/* Comment actions (if user is project member/admin and comment is not CLOSED) */}
-                      {projectId && comment.status !== "CLOSED" && (
+                      
+                      {/* Acciones de incidencia (si no está cerrada y se tienen permisos) */}
+                      {projectId && issue.status !== "CLOSED" && (
                         <div className="pt-1.5">
-                          {activeCommentId === comment.id ? (
+                          {activeCommentId === issue.id ? (
                             <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
                               <textarea
                                 value={responseText}
@@ -324,7 +324,7 @@ export function RevisionTimeline({
                                   size="sm"
                                   variant="outline"
                                   className="h-7 text-xs px-2.5 border-zinc-200"
-                                  onClick={() => handleRespond(comment.id, false)}
+                                  onClick={() => handleRespond(issue.id, false)}
                                   disabled={isPending || !responseText.trim()}
                                 >
                                   Guardar Respuesta
@@ -333,7 +333,7 @@ export function RevisionTimeline({
                                   size="sm"
                                   variant="default"
                                   className="h-7 text-xs px-2.5 bg-green-600 hover:bg-green-700 text-white"
-                                  onClick={() => handleRespond(comment.id, true)}
+                                  onClick={() => handleRespond(issue.id, true)}
                                   disabled={isPending || !responseText.trim()}
                                 >
                                   Responder y Cerrar
@@ -347,8 +347,8 @@ export function RevisionTimeline({
                                 variant="ghost"
                                 className="h-6 text-xs text-zinc-500 hover:text-zinc-900 px-2"
                                 onClick={() => {
-                                    setActiveCommentId(comment.id);
-                                    setResponseText(comment.response_text || "");
+                                    setActiveCommentId(issue.id);
+                                    setResponseText(issue.response_text || "");
                                 }}
                                 disabled={isPending}
                               >
@@ -358,7 +358,7 @@ export function RevisionTimeline({
                                 size="sm"
                                 variant="outline"
                                 className="h-6 text-xs text-green-600 hover:text-green-700 border-green-200 bg-green-50/50 px-2"
-                                onClick={() => handleDirectClose(comment.id)}
+                                onClick={() => handleDirectClose(issue.id)}
                                 disabled={isPending}
                               >
                                 <Check className="h-3 w-3 mr-1" />

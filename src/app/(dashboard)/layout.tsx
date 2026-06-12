@@ -3,6 +3,7 @@ import { UserNav } from "@/components/layout/user-nav";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { ProjectWithRole, User } from "@/lib/types";
+import { AlertTriangle } from "lucide-react";
 
 export default async function DashboardLayout({
   children,
@@ -31,6 +32,15 @@ export default async function DashboardLayout({
   if (!userProfile || !userProfile.organization_id) {
     redirect("/onboarding");
   }
+
+  // Obtener suscripción para verificar estado PAST_DUE
+  const { data: subscription } = await supabase
+    .from("subscriptions")
+    .select("status")
+    .eq("organization_id", userProfile.organization_id)
+    .maybeSingle();
+
+  const isPastDue = subscription?.status === "PAST_DUE";
 
   const currentUser: User = {
     id: userProfile.id,
@@ -114,7 +124,17 @@ export default async function DashboardLayout({
         </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto">
+          {isPastDue && (
+            <div className="bg-red-500/15 border-b border-red-500/20 text-red-600 dark:text-red-400 text-sm px-4 py-3 flex items-center gap-3">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <div className="flex-1">
+                <span className="font-bold">Suscripción Vencida (PAST_DUE):</span> Tu organización tiene pagos pendientes. Faberdoc se encuentra en modo de solo lectura. Las cargas de archivos, creación de transmittals y nuevos proyectos están bloqueadas.
+              </div>
+            </div>
+          )}
+          {children}
+        </main>
       </div>
     </div>
   );

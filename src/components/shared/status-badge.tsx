@@ -1,10 +1,10 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import type { RevisionStatus, CommentStatus } from "@/lib/types";
+import type { RevisionStatus, IssueStatus } from "@/lib/types";
 
 const STATUS_CONFIG: Record<
-  RevisionStatus | CommentStatus,
+  RevisionStatus | IssueStatus,
   { label: string; className: string }
 > = {
   DRAFT: {
@@ -37,8 +37,8 @@ const STATUS_CONFIG: Record<
     className:
       "bg-[var(--status-review-bg)] text-[var(--status-review)] border-[var(--status-review)]/20 hover:bg-[var(--status-review-bg)]",
   },
-  RESPONDED: {
-    label: "Respondido",
+  RESOLVED: {
+    label: "Resuelto",
     className:
       "bg-[var(--status-issued-bg)] text-[var(--status-issued)] border-[var(--status-issued)]/20 hover:bg-[var(--status-issued-bg)]",
   },
@@ -50,7 +50,7 @@ const STATUS_CONFIG: Record<
 };
 
 interface StatusBadgeProps {
-  status: RevisionStatus | CommentStatus;
+  status: RevisionStatus | IssueStatus;
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {

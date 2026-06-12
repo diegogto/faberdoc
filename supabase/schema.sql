@@ -176,15 +176,31 @@ CREATE TABLE IF NOT EXISTS transmittal_items (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS comments (
+CREATE TABLE IF NOT EXISTS document_issues (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     revision_id UUID REFERENCES revisions(id) ON DELETE CASCADE NOT NULL,
     author_id UUID REFERENCES users(id) NOT NULL,
     content TEXT NOT NULL,
-    status VARCHAR(50) NOT NULL CHECK (status IN ('OPEN', 'RESPONDED', 'CLOSED')),
+    status VARCHAR(50) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'RESOLVED', 'CLOSED')),
     response_text TEXT,
     closed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS comments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    parent_id UUID REFERENCES comments(id) ON DELETE CASCADE,
+    author_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+    transmittal_id UUID REFERENCES transmittals(id) ON DELETE CASCADE,
+    CONSTRAINT chk_comment_target CHECK (
+        (project_id IS NOT NULL AND document_id IS NULL AND transmittal_id IS NULL) OR
+        (project_id IS NULL AND document_id IS NOT NULL AND transmittal_id IS NULL) OR
+        (project_id IS NULL AND document_id IS NULL AND transmittal_id IS NOT NULL)
+    )
 );
 
 CREATE TABLE IF NOT EXISTS organization_invitations (
@@ -227,6 +243,7 @@ ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE issuance_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transmittals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transmittal_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE document_issues ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organization_invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE join_requests ENABLE ROW LEVEL SECURITY;
@@ -496,9 +513,9 @@ CREATE POLICY "Users can view transmittal items"
         )
     );
 
--- Comments: Usuarios ven comentarios de documentos de sus proyectos
-CREATE POLICY "Users can view revision comments"
-    ON comments FOR SELECT
+-- Document Issues: Usuarios ven incidencias de documentos de sus proyectos
+CREATE POLICY "Users can view document issues of their projects"
+    ON document_issues FOR SELECT
     USING (
         revision_id IN (
             SELECT r.id FROM revisions r
@@ -507,6 +524,63 @@ CREATE POLICY "Users can view revision comments"
             WHERE pm.user_id = (SELECT auth.uid())
         )
     );
+
+CREATE POLICY "Project members can manage document issues"
+    ON document_issues FOR ALL
+    USING (
+        revision_id IN (
+            SELECT r.id FROM revisions r
+            JOIN documents d ON d.id = r.document_id
+            JOIN project_members pm ON pm.project_id = d.project_id
+            WHERE pm.user_id = (SELECT auth.uid()) AND pm.role IN ('ADMIN', 'COORDINATOR', 'REVIEWER', 'OWNER_APPROVER')
+        )
+    );
+
+-- Comments (Conversaciones): Usuarios ven comentarios de sus entidades accesibles
+CREATE POLICY "Users can view comments of accessible entities"
+    ON comments FOR SELECT
+    USING (
+        (project_id IS NOT NULL AND project_id IN (
+            SELECT pm.project_id FROM project_members pm WHERE pm.user_id = (SELECT auth.uid())
+        ))
+        OR
+        (document_id IS NOT NULL AND document_id IN (
+            SELECT d.id FROM documents d
+            JOIN project_members pm ON pm.project_id = d.project_id
+            WHERE pm.user_id = (SELECT auth.uid())
+        ))
+        OR
+        (transmittal_id IS NOT NULL AND transmittal_id IN (
+            SELECT t.project_id FROM transmittals t
+            JOIN project_members pm ON pm.project_id = t.project_id
+            WHERE pm.user_id = (SELECT auth.uid())
+        ))
+    );
+
+CREATE POLICY "Users can insert comments on accessible entities"
+    ON comments FOR INSERT
+    WITH CHECK (
+        (project_id IS NOT NULL AND project_id IN (
+            SELECT pm.project_id FROM project_members pm WHERE pm.user_id = (SELECT auth.uid())
+        ))
+        OR
+        (document_id IS NOT NULL AND document_id IN (
+            SELECT d.id FROM documents d
+            JOIN project_members pm ON pm.project_id = d.project_id
+            WHERE pm.user_id = (SELECT auth.uid())
+        ))
+        OR
+        (transmittal_id IS NOT NULL AND transmittal_id IN (
+            SELECT t.project_id FROM transmittals t
+            JOIN project_members pm ON pm.project_id = t.project_id
+            WHERE pm.user_id = (SELECT auth.uid())
+        ))
+    );
+
+CREATE POLICY "Users can edit/delete their own comments"
+    ON comments FOR ALL
+    USING (author_id = (SELECT auth.uid()))
+    WITH CHECK (author_id = (SELECT auth.uid()));
 
 -- Issuance logs: Misma visibilidad que revisiones
 CREATE POLICY "Users can view issuance logs"
@@ -603,3 +677,22 @@ BEGIN
     END IF;
 END;
 $$;
+
+-- ══════════════════════════════════════════════════════════════
+-- FUNCTION: get_organization_storage_used_bytes
+-- ══════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.get_organization_storage_used_bytes(org_id UUID)
+RETURNS BIGINT
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+    SELECT COALESCE(SUM(f.file_size_bytes), 0)::BIGINT
+    FROM public.files f
+    JOIN public.revisions r ON f.revision_id = r.id
+    JOIN public.documents d ON r.document_id = d.id
+    JOIN public.projects p ON d.project_id = p.id
+    WHERE p.organization_id = org_id;
+$$;
+

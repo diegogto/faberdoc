@@ -26,8 +26,9 @@ import { DocumentDrawer } from "./document-drawer";
 import { DocumentCreateDialog } from "./document-create-dialog";
 import { DocumentImportDialog } from "./document-import-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
-import { createClient } from "@/lib/supabase/client";
+import { getDocumentDetailAction } from "@/app/(dashboard)/projects/[projectId]/mdl/actions";
 import type { DocumentTableRow, DocumentDetail, CustomPropertyDefinition } from "@/lib/types";
+
 
 type ProjectRole = "ADMIN" | "COORDINATOR" | "REVIEWER" | "OWNER_APPROVER" | "VIEWER" | "UPLOADER";
 
@@ -127,105 +128,15 @@ export function DocumentTable({
     setIsLoadingDetail(true);
 
     try {
-      const supabase = createClient();
+      const res = await getDocumentDetailAction(projectId, documentId);
 
-      // Obtener documento completo con revisiones, archivos, comentarios e issuance
-      const { data: doc } = await supabase
-        .from("documents")
-        .select(
-          `
-          *,
-          revisions (
-            *,
-            uploader:users!uploader_id ( full_name ),
-            files ( * ),
-            comments ( * ),
-            issuance_logs ( * )
-          )
-        `
-        )
-        .eq("id", documentId)
-        .single();
-
-      if (!doc) {
+      if (res.error || !res.detail) {
+        console.error("Error fetching document detail:", res.error);
         setSelectedDocumentDetail(null);
         return;
       }
 
-      // Transformar a DocumentDetail
-      const revisions = (doc.revisions as Array<{
-        id: string;
-        document_id: string;
-        uploader_id: string;
-        version_label: string;
-        version_index: number;
-        status: string;
-        created_at: string;
-        uploader: { full_name: string } | null;
-        files: Array<{
-          id: string;
-          revision_id: string;
-          s3_key: string;
-          file_name: string;
-          file_size_bytes: number;
-          created_at: string;
-        }>;
-        comments: Array<{
-          id: string;
-          revision_id: string;
-          author_id: string;
-          content: string;
-          status: string;
-          response_text: string | null;
-          closed_at: string | null;
-          created_at: string;
-        }>;
-        issuance_logs: Array<{
-          id: string;
-          revision_id: string;
-          original_planned_date: string;
-          current_planned_date: string;
-          actual_issuance_date: string | null;
-          iteration_count: number;
-          created_at: string;
-        }>;
-      }>) ?? [];
-
-      // Ordenar revisiones por version_index (más reciente primero)
-      revisions.sort((a, b) => b.version_index - a.version_index);
-
-      // Tomar el issuance de la última revisión
-      const latestIssuance = revisions[0]?.issuance_logs?.[0] ?? null;
-
-      const detail: DocumentDetail = {
-        document: {
-          id: doc.id,
-          project_id: doc.project_id,
-          document_code: doc.document_code,
-          title: doc.title,
-          custom_properties: doc.custom_properties,
-          created_at: doc.created_at,
-          deleted_at: doc.deleted_at,
-        },
-        revisions: revisions.map((rev) => ({
-          id: rev.id,
-          document_id: rev.document_id,
-          uploader_id: rev.uploader_id,
-          version_label: rev.version_label,
-          version_index: rev.version_index,
-          status: rev.status as DocumentDetail["revisions"][0]["status"],
-          created_at: rev.created_at,
-          uploader_name: rev.uploader?.full_name ?? "Desconocido",
-          files: rev.files ?? [],
-          comments: (rev.comments ?? []).map((c) => ({
-            ...c,
-            status: c.status as "OPEN" | "RESPONDED" | "CLOSED",
-          })),
-        })),
-        issuance: latestIssuance,
-      };
-
-      setSelectedDocumentDetail(detail);
+      setSelectedDocumentDetail(res.detail as DocumentDetail);
     } catch (error) {
       console.error("Error fetching document detail:", error);
       setSelectedDocumentDetail(null);
@@ -233,6 +144,7 @@ export function DocumentTable({
       setIsLoadingDetail(false);
     }
   };
+
 
   const handleDrawerClose = () => {
     setIsDrawerOpen(false);

@@ -14,7 +14,7 @@ import type {
   DocumentDetail,
   Revision,
   FileRecord,
-  Comment,
+  DocumentIssue,
   IssuanceLog,
 } from "./types";
 
@@ -465,7 +465,7 @@ export function getMockDocumentDetail(documentId: string): DocumentDetail | null
   const revisions: (Revision & {
     files: FileRecord[];
     uploader_name: string;
-    comments: Comment[];
+    issues: DocumentIssue[];
   })[] = [
     {
       id: "rev-003",
@@ -486,7 +486,7 @@ export function getMockDocumentDetail(documentId: string): DocumentDetail | null
           created_at: "2025-05-18T10:00:00Z",
         },
       ],
-      comments: [],
+      issues: [],
     },
     {
       id: "rev-002",
@@ -507,7 +507,7 @@ export function getMockDocumentDetail(documentId: string): DocumentDetail | null
           created_at: "2025-04-20T14:30:00Z",
         },
       ],
-      comments: [
+      issues: [
         {
           id: "cmt-001",
           revision_id: "rev-002",
@@ -549,7 +549,7 @@ export function getMockDocumentDetail(documentId: string): DocumentDetail | null
           created_at: "2025-03-15T09:00:00Z",
         },
       ],
-      comments: [],
+      issues: [],
     },
   ];
 

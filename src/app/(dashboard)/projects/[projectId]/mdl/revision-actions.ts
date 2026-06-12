@@ -15,6 +15,7 @@ import {
 import { formatIterationLabel } from "@/lib/version-utils";
 import { initiateWorkflow, transitionWorkflow } from "@/lib/workflow-engine";
 import { checkIfProjectArchived } from "@/app/(dashboard)/projects/actions";
+import { checkPastDueByProject, checkStorageLimit } from "@/lib/services/limits";
 
 // Helper helper to generate letter label for an index (0 -> A, 1 -> B, etc.)
 function getLetterForIndex(index: number): string {
@@ -58,6 +59,88 @@ async function verifyUserProjectAccess(projectId: string) {
 }
 
 /**
+ * Verifica si un documento pertenece a un proyecto.
+ */
+async function verifyDocumentBelongsToProject(
+  adminSupabase: any,
+  documentId: string,
+  projectId: string
+): Promise<{ error: string | null; document?: any }> {
+  const { data: document, error } = await adminSupabase
+    .from("documents")
+    .select("id, project_id, custom_properties")
+    .eq("id", documentId)
+    .single();
+
+  if (error || !document) {
+    return { error: "No se pudo encontrar el documento especificado." };
+  }
+
+  if (document.project_id !== projectId) {
+    return { error: "El documento no pertenece a este proyecto." };
+  }
+
+  return { error: null, document };
+}
+
+/**
+ * Verifica si una revisión pertenece a un proyecto y opcionalmente a un documento.
+ */
+async function verifyRevisionBelongsToProject(
+  adminSupabase: any,
+  revisionId: string,
+  projectId: string,
+  documentId?: string
+): Promise<{ error: string | null; revision?: any }> {
+  const { data: revision, error } = await adminSupabase
+    .from("revisions")
+    .select("id, status, comment_level, current_flow_id, active_nodes, document_id, document:documents(id, project_id)")
+    .eq("id", revisionId)
+    .single();
+
+  if (error || !revision) {
+    return { error: "No se pudo encontrar la revisión especificada." };
+  }
+
+  const doc = revision.document as any;
+  if (!doc || doc.project_id !== projectId) {
+    return { error: "La revisión no pertenece a este proyecto." };
+  }
+
+  if (documentId && revision.document_id !== documentId) {
+    return { error: "La revisión no pertenece al documento especificado." };
+  }
+
+  return { error: null, revision };
+}
+
+/**
+ * Verifica si un archivo (identificado por su S3 Key) pertenece a un proyecto.
+ */
+async function verifyFileBelongsToProject(
+  adminSupabase: any,
+  s3Key: string,
+  projectId: string
+): Promise<{ error: string | null; fileRecord?: any }> {
+  const { data: fileRecord, error } = await adminSupabase
+    .from("files")
+    .select("id, revision_id, revisions(document_id, version_index, documents(project_id))")
+    .eq("s3_key", s3Key)
+    .single();
+
+  if (error || !fileRecord) {
+    return { error: "No se pudo encontrar el archivo especificado." };
+  }
+
+  const projId = (fileRecord.revisions as any)?.documents?.project_id;
+  if (projId !== projectId) {
+    return { error: "El archivo no pertenece a este proyecto." };
+  }
+
+  return { error: null, fileRecord };
+}
+
+/**
  * Creates the next revision index/label for a document, propagating any unresolved comments.
  */
 export async function createNextRevisionAction(projectId: string, documentId: string) {
@@ -70,9 +153,20 @@ export async function createNextRevisionAction(projectId: string, documentId: st
     return { error: access.error };
   }
 
+  const pastDueCheck = await checkPastDueByProject(projectId);
+  if (!pastDueCheck.allowed) {
+    return { error: pastDueCheck.error };
+  }
+
   const adminSupabase = createAdminClient();
 
   try {
+    // 0. Verify document belongs to project
+    const docVerification = await verifyDocumentBelongsToProject(adminSupabase, documentId, projectId);
+    if (docVerification.error) {
+      return { error: docVerification.error };
+    }
+
     // 1. Get project config
     const { data: project, error: projError } = await adminSupabase
       .from("projects")
@@ -125,17 +219,17 @@ export async function createNextRevisionAction(projectId: string, documentId: st
       return { error: `No se pudo crear la revisión: ${createError?.message}` };
     }
 
-    // 4. Propagate unresolved comments (status = 'OPEN') from the previous revision (if any)
+    // 4. Propagate unresolved issues (status = 'OPEN') from the previous revision (if any)
     if (hasRevisions) {
       const latestRevId = revisions[0].id;
-      const { data: openComments } = await adminSupabase
-        .from("comments")
+      const { data: openIssues } = await adminSupabase
+        .from("document_issues")
         .select("author_id, content")
         .eq("revision_id", latestRevId)
         .eq("status", "OPEN");
 
-      if (openComments && openComments.length > 0) {
-        const commentsToInsert = openComments.map((c) => ({
+      if (openIssues && openIssues.length > 0) {
+        const issuesToInsert = openIssues.map((c) => ({
           revision_id: newRev.id,
           author_id: c.author_id,
           content: c.content,
@@ -143,11 +237,11 @@ export async function createNextRevisionAction(projectId: string, documentId: st
         }));
 
         const { error: copyError } = await adminSupabase
-          .from("comments")
-          .insert(commentsToInsert);
+          .from("document_issues")
+          .insert(issuesToInsert);
 
         if (copyError) {
-          console.error("Error al copiar comentarios sin resolver:", copyError);
+          console.error("Error al copiar incidencias sin resolver:", copyError);
         }
       }
     }
@@ -179,14 +273,30 @@ export async function uploadRevisionFileAction(
     return { error: access.error };
   }
 
+  const pastDueCheck = await checkPastDueByProject(projectId);
+  if (!pastDueCheck.allowed) {
+    return { error: pastDueCheck.error };
+  }
+
   const file = formData.get("file") as File | null;
   if (!file) {
     return { error: "No se proporcionó ningún archivo." };
   }
 
+  const storageCheck = await checkStorageLimit(projectId, file.size);
+  if (!storageCheck.allowed) {
+    return { error: storageCheck.error };
+  }
+
   const adminSupabase = createAdminClient();
 
   try {
+    // 0. Verify revision belongs to project and document
+    const revVerification = await verifyRevisionBelongsToProject(adminSupabase, revisionId, projectId, documentId);
+    if (revVerification.error) {
+      return { error: revVerification.error };
+    }
+
     // 1. Upload file using agnostic storage service
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -220,15 +330,7 @@ export async function uploadRevisionFileAction(
     }
 
     // 3. Compute status transitions
-    const { data: revision, error: revError } = await adminSupabase
-      .from("revisions")
-      .select("status, comment_level")
-      .eq("id", revisionId)
-      .single();
-
-    if (revError || !revision) {
-      return { error: "No se pudo recuperar la revisión asociada." };
-    }
+    const revision = revVerification.revision;
 
     let nextStatus = revision.status;
     if (revision.status === "COMMENTED") {
@@ -280,19 +382,21 @@ export async function updateRevisionStatusAction(
     return { error: access.error };
   }
 
+  const pastDueCheck = await checkPastDueByProject(projectId);
+  if (!pastDueCheck.allowed) {
+    return { error: pastDueCheck.error };
+  }
+
   const adminSupabase = createAdminClient();
 
   try {
-    // 1. Obtener la revisión actual y la config de flujos del proyecto
-    const { data: revision, error: revError } = await adminSupabase
-      .from("revisions")
-      .select("status, current_flow_id, active_nodes, document_id")
-      .eq("id", revisionId)
-      .single();
-
-    if (revError || !revision) {
-      return { error: "No se encontró la revisión." };
+    // 0. Verify revision belongs to project
+    const revVerification = await verifyRevisionBelongsToProject(adminSupabase, revisionId, projectId);
+    if (revVerification.error) {
+      return { error: revVerification.error };
     }
+
+    const revision = revVerification.revision;
 
     const { data: project } = await adminSupabase
       .from("projects")
@@ -395,9 +499,9 @@ export async function updateRevisionStatusAction(
 }
 
 /**
- * Adds an open comment to a revision.
+ * Adds an open issue to a revision.
  */
-export async function addCommentToRevisionAction(
+export async function addIssueToRevisionAction(
   projectId: string,
   revisionId: string,
   content: string
@@ -411,15 +515,26 @@ export async function addCommentToRevisionAction(
     return { error: access.error };
   }
 
+  const pastDueCheck = await checkPastDueByProject(projectId);
+  if (!pastDueCheck.allowed) {
+    return { error: pastDueCheck.error };
+  }
+
   if (!content.trim()) {
-    return { error: "El comentario no puede estar vacío." };
+    return { error: "La incidencia no puede estar vacía." };
   }
 
   const adminSupabase = createAdminClient();
 
   try {
+    // Verify revision belongs to project
+    const revVerification = await verifyRevisionBelongsToProject(adminSupabase, revisionId, projectId);
+    if (revVerification.error) {
+      return { error: revVerification.error };
+    }
+
     const { error } = await adminSupabase
-      .from("comments")
+      .from("document_issues")
       .insert({
         revision_id: revisionId,
         author_id: access.user.id,
@@ -428,21 +543,21 @@ export async function addCommentToRevisionAction(
       });
 
     if (error) {
-      return { error: `Error al agregar comentario: ${error.message}` };
+      return { error: `Error al agregar incidencia: ${error.message}` };
     }
 
     revalidatePath(`/projects/${projectId}/mdl`);
     return { success: true };
   } catch (err) {
-    console.error("Excepción en creación de comentario:", err);
+    console.error("Excepción en creación de incidencia:", err);
     return { error: "Ocurrió un error inesperado." };
   }
 }
 
 /**
- * Responds to a specific comment, optionally closing it.
+ * Responds to a specific issue, optionally closing it.
  */
-export async function respondToCommentAction(
+export async function respondToIssueAction(
   projectId: string,
   commentId: string,
   responseText: string,
@@ -457,9 +572,30 @@ export async function respondToCommentAction(
     return { error: access.error };
   }
 
+  const pastDueCheck = await checkPastDueByProject(projectId);
+  if (!pastDueCheck.allowed) {
+    return { error: pastDueCheck.error };
+  }
+
   const adminSupabase = createAdminClient();
 
   try {
+    // Verify issue belongs to project
+    const { data: issue, error: issueError } = await adminSupabase
+      .from("document_issues")
+      .select("id, revision:revisions(document:documents(project_id))")
+      .eq("id", commentId)
+      .single();
+
+    if (issueError || !issue) {
+      return { error: "No se encontró la incidencia." };
+    }
+
+    const issueProjId = (issue.revision as any)?.document?.project_id;
+    if (issueProjId !== projectId) {
+      return { error: "La incidencia no pertenece a este proyecto." };
+    }
+
     const updateData: { response_text: string; status?: string; closed_at?: string | null } = {
       response_text: responseText.trim(),
     };
@@ -468,23 +604,23 @@ export async function respondToCommentAction(
       updateData.status = "CLOSED";
       updateData.closed_at = new Date().toISOString();
     } else {
-      updateData.status = "RESPONDED";
+      updateData.status = "RESOLVED";
       updateData.closed_at = null;
     }
 
     const { error } = await adminSupabase
-      .from("comments")
+      .from("document_issues")
       .update(updateData)
       .eq("id", commentId);
 
     if (error) {
-      return { error: `Error al responder comentario: ${error.message}` };
+      return { error: `Error al responder incidencia: ${error.message}` };
     }
 
     revalidatePath(`/projects/${projectId}/mdl`);
     return { success: true };
   } catch (err) {
-    console.error("Excepción al responder comentario:", err);
+    console.error("Excepción al responder incidencia:", err);
     return { error: "Ocurrió un error inesperado." };
   }
 }
@@ -620,8 +756,8 @@ async function sendRevisionStatusNotifications(projectId: string, revisionId: st
             .filter((email) => email && email !== uploader.email);
         }
 
-        const { count: commentsCount } = await adminSupabase
-          .from("comments")
+        const { count: issuesCount } = await adminSupabase
+          .from("document_issues")
           .select("*", { count: "exact", head: true })
           .eq("revision_id", revisionId)
           .eq("status", "OPEN");
@@ -633,7 +769,7 @@ async function sendRevisionStatusNotifications(projectId: string, revisionId: st
           documentTitle,
           revision.version_label,
           (revision.comment_level || "MAJOR") as "MINOR" | "MAJOR",
-          commentsCount || 0,
+          issuesCount || 0,
           detailLink,
           logoUrl
         );
@@ -718,6 +854,14 @@ export async function getDownloadUrlAction(projectId: string, s3Key: string) {
   }
 
   try {
+    const adminSupabase = createAdminClient();
+
+    // Verify file belongs to project
+    const fileVerification = await verifyFileBelongsToProject(adminSupabase, s3Key, projectId);
+    if (fileVerification.error) {
+      return { error: fileVerification.error };
+    }
+
     const { data: project } = await supabase
       .from("projects")
       .select("archived_at")
@@ -725,12 +869,7 @@ export async function getDownloadUrlAction(projectId: string, s3Key: string) {
       .single();
 
     if (project?.archived_at) {
-      const adminSupabase = createAdminClient();
-      const { data: fileRecord } = await adminSupabase
-        .from("files")
-        .select("id, revision_id, revisions(document_id, version_index)")
-        .eq("s3_key", s3Key)
-        .single();
+      const fileRecord = fileVerification.fileRecord;
 
       if (fileRecord && fileRecord.revisions) {
         const { document_id, version_index } = fileRecord.revisions as any;
@@ -783,7 +922,25 @@ export async function getSignedUploadUrlAction(
     return { error: access.error };
   }
 
+  const pastDueCheck = await checkPastDueByProject(projectId);
+  if (!pastDueCheck.allowed) {
+    return { error: pastDueCheck.error };
+  }
+
+  const storageCheck = await checkStorageLimit(projectId, 0);
+  if (!storageCheck.allowed) {
+    return { error: storageCheck.error };
+  }
+
+  const adminSupabase = createAdminClient();
+
   try {
+    // Verify revision and document belong to project
+    const revVerification = await verifyRevisionBelongsToProject(adminSupabase, revisionId, projectId, documentId);
+    if (revVerification.error) {
+      return { error: revVerification.error };
+    }
+
     const timestamp = Date.now();
     const cleanFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
     const uniqueName = `${timestamp}-${cleanFileName}`;
@@ -823,9 +980,25 @@ export async function registerUploadedFileAction(
     return { error: access.error };
   }
 
+  const pastDueCheck = await checkPastDueByProject(projectId);
+  if (!pastDueCheck.allowed) {
+    return { error: pastDueCheck.error };
+  }
+
+  const storageCheck = await checkStorageLimit(projectId, fileSize);
+  if (!storageCheck.allowed) {
+    return { error: storageCheck.error };
+  }
+
   const adminSupabase = createAdminClient();
 
   try {
+    // 0. Verify revision belongs to project and document
+    const revVerification = await verifyRevisionBelongsToProject(adminSupabase, revisionId, projectId, documentId);
+    if (revVerification.error) {
+      return { error: revVerification.error };
+    }
+
     // 1. Guardar registro del archivo en la base de datos
     const { data: fileRecord, error: fileError } = await adminSupabase
       .from("files")
@@ -845,15 +1018,7 @@ export async function registerUploadedFileAction(
     }
 
     // 2. Calcular transiciones de estado de la revisión usando el motor de flujo
-    const { data: revision, error: revError } = await adminSupabase
-      .from("revisions")
-      .select("status, comment_level, current_flow_id, active_nodes")
-      .eq("id", revisionId)
-      .single();
-
-    if (revError || !revision) {
-      return { error: "No se pudo recuperar la revisión asociada." };
-    }
+    const revision = revVerification.revision;
 
     const { data: project } = await adminSupabase
       .from("projects")
